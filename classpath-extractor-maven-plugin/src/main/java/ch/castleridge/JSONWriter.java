@@ -27,20 +27,20 @@ public class JSONWriter {
 
         public void object(Consumer<PropertyWriter> writeProperties) {
             writer.println("{");
-            writeProperties.accept(new PropertyWriter(indent+"  "));
+            writeProperties.accept(new PropertyWriter(indent+"   "));
             writer.println();
             writer.print(indent+"}");
         }
 
         public void array(Consumer<ArrayWriter> writeValues) {
             writer.println("[");
-            writeValues.accept(new ArrayWriter(indent+"  "));
+            writeValues.accept(new ArrayWriter(indent+"   "));
             writer.println();
             writer.print(indent+"]");
         }
 
         public void string(String value) {
-            writer.print(indent+"\"" + value.replace("\\", "\\\\") + "\"");
+            writer.print("\"" + value.replace("\\", "\\\\") + "\"");
         }
     }
     
@@ -56,7 +56,8 @@ public class JSONWriter {
                 writer.println(",");
             }
             first = false;
-            writeValue.accept(new ValueWriter(indent));
+            writer.write(indent);
+            writeValue.accept(new ValueWriter(indent+"   "));
         }
     }
 
@@ -78,7 +79,11 @@ public class JSONWriter {
         }
     }
 
+    public PropertyWriter object(String indent)  {
+        return new PropertyWriter(indent);
+    }
+
     public PropertyWriter object()  {
-        return new PropertyWriter("");
+        return this.object("");
     }
 }
