@@ -12,11 +12,20 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
 
   @Override
   public void afterSessionStart(MavenSession session) throws MavenExecutionException {
-    // Hook: after Maven session starts
+    Path path = Paths.get(this.cpFile);
+    PrintWriter writer = new PrintWriter(Files.newBufferedWriter(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING));
+    PropertyWriter jsonWriter = new JSONWriter(writer).object();
+    writer.println('{');
+    session.getUserProperties().put("jsonWriter", jsonWriter);
+    session.getUserProperties().put("writer", writer);
   }
 
   @Override
-  public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
-    // Hook: after projects are read (can access project list)
+  public void afterSessionEnd(MavenSession session) throws MavenExecutionException {
+    PrintWriter writer = (PrintWriter) session.getUserProperties().get("writer");
+    
+    writer.println('}');
+    writer.flush();
+    writer.close();
   }
 }

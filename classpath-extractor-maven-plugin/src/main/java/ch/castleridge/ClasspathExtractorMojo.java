@@ -15,6 +15,35 @@ public class ClasspathExtractorMojo extends AbstractMojo {
 
   @Override
   public void execute() throws MojoExecutionException {
-    getLog().info("Classpath extractor goal executed for project: " + project.getArtifactId());
+    PropertyWriter jsonWriter = (PropertyWriter) session.getUserProperties().get("jsonWriter");
+    jsonWriter.property(
+      project.getGroupId() + ":" + project.getArtifactId() + ":" + project.getVersion(),
+      writeValue -> {
+          dumpProjectInfo(writeValue, project);
+      });  
+    }
+
+    private void dumpProjectInfo(ValueWriter jsonWriter, MavenProject project) {
+      jsonWriter.object(w -> {
+          w.property("main", u -> u.array(v -> {
+              for (String root : project.getCompileSourceRoots()) {
+                  v.element(x -> x.string(root));
+              }
+          }));
+          w.property("test", u -> u.array(v -> {
+              for (String root : project.getTestCompileSourceRoots()) {
+                  v.element(x -> x.string(root));
+              }
+          }));
+          w.property("dependencies", u -> u.object(v -> {
+              for (Artifact dep : project.getArtifacts()) {
+                  String key = dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion();
+                  v.property(key, x -> x.object(y -> {
+                      y.property("path", z -> z.string(dep.getFile().toString()));
+                      y.property("scope", z -> z.string(dep.getScope()));
+                  }));
+              }
+          }));
+      });
   }
 }
