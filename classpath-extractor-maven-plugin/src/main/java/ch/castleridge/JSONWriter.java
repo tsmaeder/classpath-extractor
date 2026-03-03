@@ -25,14 +25,14 @@ public class JSONWriter {
             this.indent = indent;
         }
 
-        void object(Consumer<PropertyWriter> writeProperties) {
+        public void object(Consumer<PropertyWriter> writeProperties) {
             writer.println("{");
             writeProperties.accept(new PropertyWriter(indent+"  "));
             writer.println();
             writer.print(indent+"}");
         }
 
-        void array(Consumer<ArrayWriter> writeValues) {
+        public void array(Consumer<ArrayWriter> writeValues) {
             writer.println("[");
             writeValues.accept(new ArrayWriter(indent+"  "));
             writer.println();
@@ -51,7 +51,7 @@ public class JSONWriter {
             this.indent = indent;
         }
 
-        void element(Consumer<ValueWriter> writeValue) {
+        public void element(Consumer<ValueWriter> writeValue) {
             if (!first) {
                 writer.println(",");
             }
@@ -67,7 +67,7 @@ public class JSONWriter {
             this.indent = indent;
         }
         boolean first = true;
-        void property(String property, Consumer<ValueWriter> writeValue) {
+        public void property(String property, Consumer<ValueWriter> writeValue) {
             if (!first) {
                 writer.println(",");
             }
