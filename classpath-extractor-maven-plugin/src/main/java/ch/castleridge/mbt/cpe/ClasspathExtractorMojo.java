@@ -1,4 +1,4 @@
-package ch.castleridge;
+package ch.castleridge.mbt.cpe;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -55,6 +55,7 @@ public class ClasspathExtractorMojo extends AbstractMojo {
 
   private void dumpProjectInfo(JSONWriter.ValueWriter jsonWriter, MavenProject project) {
     jsonWriter.object(w -> {
+      w.property("pom", u -> u.string(project.getFile().toString()));
       w.property("main", u -> u.array(v -> {
         for (String root : project.getCompileSourceRoots()) {
           v.element(x -> x.string(root));

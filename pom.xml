@@ -23,6 +23,7 @@
   <modules>
     <module>lifecycle-participant</module>
     <module>classpath-extractor-maven-plugin</module>
+    <module>mbt-extractor</module>
   </modules>
 
   <dependencyManagement>

@@ -1,4 +1,4 @@
-package ch.castleridge;
+package ch.castleridge.mbt.cpe;
 
 import java.io.PrintWriter;
 import java.util.function.Consumer;

@@ -1,4 +1,4 @@
-package ch.castleridge;
+package ch.castleridge.mbt.cpe;
 
 import java.io.IOException;
 import java.io.PrintWriter;
