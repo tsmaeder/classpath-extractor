@@ -18,7 +18,16 @@
   <description>Executable jar for MBT extraction</description>
 
   <dependencies>
-    <!-- Add dependencies here as needed -->
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>2.10.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven.shared</groupId>
+      <artifactId>maven-invoker</artifactId>
+      <version>3.2.0</version>
+    </dependency>
   </dependencies>
 
   <build>
