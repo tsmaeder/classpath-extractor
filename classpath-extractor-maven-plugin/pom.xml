@@ -36,6 +36,11 @@
       <version>${maven-plugin-tools.version}</version>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>ch.castleridge</groupId>
+      <artifactId>lifecycle-participant</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
   <build>

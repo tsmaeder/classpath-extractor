@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 
+import javax.inject.Inject;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
@@ -25,9 +27,18 @@ public class ClasspathExtractorMojo extends AbstractMojo {
   @Parameter(defaultValue = "${session}", readonly = true)
   private MavenSession session;
 
+  @Inject()
+  private ClasspathExtractorParticipant participant;
+
   @Override
   public void execute() throws MojoExecutionException {
     getLog().info("Extracting classpath information for project " + project.getGroupId() + ":" + project.getArtifactId() + ":" + project.getVersion());
+    try {
+      participant.doSomething();
+    } catch (Exception e) {
+      getLog().error("Error doing something", e);
+      throw new MojoExecutionException("Error doing something", e);
+    }
     
     String outfile = session.getUserProperties().getProperty("outfile");
     if (outfile == null) {
