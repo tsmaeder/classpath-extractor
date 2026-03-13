@@ -1,18 +1,17 @@
 package ch.castleridge.mbt.cpe;
 
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
+import ch.castleridge.mbt.cpe.json.MavenExtractedInfo;
+import ch.castleridge.mbt.cpe.json.MavenTargetInfo;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
-import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.maven.shared.invoker.DefaultInvocationRequest;
 import org.apache.maven.shared.invoker.DefaultInvoker;
@@ -43,7 +42,6 @@ public class MBTExtractor {
       }
 
       Gson gson = new Gson();
-      Type type = TypeToken.getParameterized(Map.class, String.class, ClasspathModule.class).getType();
 
       while (!todo.isEmpty()) {
         Path pomPath = todo.remove(0);
@@ -55,8 +53,8 @@ public class MBTExtractor {
         Path outfile = createUniqueOutfile();
         try {
           runMavenBuild(projectDir, participantJar, outfile);
-          Map<String, ClasspathModule> classpath = readClasspathJson(gson, type, outfile);
-          List<Path> pomPathsFromJson = collectPomPaths(classpath);
+          MavenExtractedInfo extractedInfo = readClasspathJson(gson, outfile);
+          List<Path> pomPathsFromJson = collectPomPaths(extractedInfo);
           removePomsFromTodo(todo, pomPathsFromJson);
         } finally {
           try {
@@ -169,21 +167,21 @@ public class MBTExtractor {
     }
   }
 
-  private static Map<String, ClasspathModule> readClasspathJson(Gson gson, Type type, Path outfile)
+  private static MavenExtractedInfo readClasspathJson(Gson gson, Path outfile)
       throws IOException {
     try (Reader reader = Files.newBufferedReader(outfile)) {
-      return gson.fromJson(reader, type);
+      return gson.fromJson(reader, MavenExtractedInfo.class);
     }
   }
 
-  private static List<Path> collectPomPaths(Map<String, ClasspathModule> classpath) {
+  private static List<Path> collectPomPaths(MavenExtractedInfo extractedInfo) {
     List<Path> result = new ArrayList<>();
-    if (classpath == null) {
+    if (extractedInfo == null) {
       return result;
     }
-    for (ClasspathModule module : classpath.values()) {
-      if (module != null && module.getPom() != null && !module.getPom().isEmpty()) {
-        result.add(Path.of(module.getPom()).normalize().toAbsolutePath());
+    for (MavenTargetInfo target : extractedInfo.mavenTargets.values()) {
+      if (target != null && target.getPom() != null && !target.getPom().isEmpty()) {
+        result.add(Path.of(target.getPom()).normalize().toAbsolutePath());
       }
     }
     return result;

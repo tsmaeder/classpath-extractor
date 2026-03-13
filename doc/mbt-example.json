@@ -1,0 +1,44 @@
+{
+    "targets": [
+        {
+            "id": "org.apache.maven:maven-core:3.9.12-SNAPSHOT:main",
+            "javacOptions": {
+                "--add-exports": "xyz"
+            },
+            "jdk": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.8.9-hotspot",
+            "sources": [
+                "D:\\anysphere\\maven\\maven-core\\src\\main\\java",
+                "D:\\anysphere\\maven\\maven-core\\target\\generated-sources\\modello",
+                "D:\\anysphere\\maven\\maven-core\\target\\generated-sources\\annotations"
+            ],
+            "dependencyModules": [
+                "org.apache.maven:maven-model:3.9.12-SNAPSHOT:main",
+                "org.codehaus.plexus:plexus-sec-dispatcher:2.0:main"
+            ]
+        },
+        {
+            "id": "org.apache.maven:maven-core:3.9.12-SNAPSHOT:test",
+            "jdk": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.8.9-hotspot",
+            "sources": [  
+                "D:\\anysphere\\maven\\maven-core\\src\\test\\java"
+            ],
+            "dependencyModules": [
+                "org.apache.maven:maven-core:3.9.12-SNAPSHOT:main",
+                "org.apache.maven:maven-model:3.9.12-SNAPSHOT:main",
+                "org.codehaus.plexus:plexus-sec-dispatcher:2.0:main",
+                "org.mockito:mockito-core:4.11.0:main"
+            ]
+        }
+    ],
+    "dependencyModules": [
+        {
+            "id": "org.codehaus.plexus:plexus-sec-dispatcher:2.0:main",
+            "path": "C:\\Users\\thomas\\.m2\\repository\\org\\codehaus\\plexus\\plexus-sec-dispatcher\\2.0\\plexus-sec-dispatcher-2.0.jar",
+            "source": "C:\\Users\\thomas\\.m2\\repository\\org\\codehaus\\plexus\\plexus-sec-dispatcher\\2.0\\plexus-sec-dispatcher-2.0-sources.jar"
+        },
+        {
+            "id": "org.mockito:mockito-core:4.11.0:main",
+            "path": "C:\\Users\\thomas\\.m2\\repository\\org\\mockito\\mockito-core\\4.11.0\\mockito-core-4.11.0.jar"
+        }
+    ]
+}
