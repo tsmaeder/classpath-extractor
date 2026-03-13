@@ -8,11 +8,11 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import javax.inject.Named;
@@ -36,6 +36,16 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
 
   ClasspathExtractorParticipant() {
     LOGGER.info("ClasspathExtractorParticipant initialized");
+  }
+
+  public static class MavenExtractedInfo {
+    MavenExtractedInfo(Map<String, MavenTargetInfo> mavenTargets, Map<String, String> reportedDependencies) {
+      this.mavenTargets = mavenTargets;
+      this.reportedDependencies = reportedDependencies;
+    }
+
+    public Map<String, MavenTargetInfo> mavenTargets;
+    public Map<String, String> reportedDependencies;
   }
 
   public static class MavenTargetInfo {
@@ -101,25 +111,51 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
       "sortpom-maven-plugin",
       "jacoco-maven-plugin",
       "license-maven-plugin",
-      "frontend-maven-plugin", 
+      "frontend-maven-plugin",
       "maven-compiler-plugin",
-    "trino-maven-plugin"));
+      "trino-maven-plugin"));
 
-      private static final Set<String> SKIPPED_PHASES = new HashSet<>(Arrays.asList(
-        "initialize",
-        "validate",
-        "generate-resources",
-        "process-resources",
-        "generate-test-resources",
-        "process-test-resources",
-        "test-compile", 
-        "compile"));
+  private static final Set<String> SKIPPED_PHASES = new HashSet<>(Arrays.asList(
+      "initialize",
+      "validate",
+      "generate-resources",
+      "process-resources",
+      "generate-test-resources",
+      "process-test-resources",
+      "test-compile",
+      "compile"));
+
+  @Override
+  public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
+    for (MavenProject project : session.getProjects()) {
+      Build build = project.getBuild();
+      if (build == null || build.getPlugins() == null) {
+        continue;
+      }
+
+      for (Plugin plugin : build.getPlugins()) {
+        if (plugin == null || plugin.getArtifactId() == null) {
+          continue;
+        }
+        if (SKIPPED_PLUGIN_ARTIFACT_IDS.contains(plugin.getArtifactId())) {
+          plugin.setExecutions(Collections.emptyList());
+          LOGGER.info("Removed execution(s) from plugin {} in project {}", plugin.getArtifactId(), project.getArtifactId());
+        } else {
+          plugin.setExecutions(plugin.getExecutions().stream()
+              .filter(execution -> !SKIPPED_PHASES.contains(execution.getPhase())).collect(Collectors.toList()));
+          LOGGER.info("Removed execution(s) from plugin {} in project {}", plugin.getArtifactId(), project.getArtifactId());
+        }
+      }
+    }
+  }
 
   @SuppressWarnings("unchecked")
   public void reportMavenTarget(MavenSession session, String id, MavenTarget mavenTarget) {
     LOGGER.info("Reporting maven target {}", id);
-    Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties().get("mavenTargets");
-    Map<String, String> reportedDependencies = (Map<String, String>) session.getUserProperties().get("reportedDependencies");
+    Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties()
+        .get("mavenTargets");
+    Map<String, String> reportedDependencies = (Map<String, String>) session.getUserProperties()
+        .get("reportedDependencies");
     for (Map.Entry<String, Dependency> dependency : mavenTarget.getDependencies().entrySet()) {
       reportedDependencies.put(dependency.getKey(), dependency.getValue().getPath());
     }
@@ -142,42 +178,8 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
 
   @Override
   public void afterSessionStart(MavenSession session) throws MavenExecutionException {
-    session.getUserProperties().put("mavenTargets", new HashMap<String, MavenTargetInfo>());
-    session.getUserProperties().put("reportedDependencies", new HashMap<String, String>());
-  }
-
-  @Override
-  public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
-    for (MavenProject project : session.getProjects()) {
-      Build build = project.getBuild();
-      if (build == null || build.getPlugins() == null) {
-        continue;
-      }
-
-      for (Plugin plugin : build.getPlugins()) {
-        if (plugin == null || plugin.getArtifactId() == null) {
-          continue;
-        }
-        if (SKIPPED_PLUGIN_ARTIFACT_IDS.contains(plugin.getArtifactId())) {
-          plugin.setExecutions(Collections.emptyList());
-          LOGGER.info("Removed execution(s) from plugin {} in project {}",
-              plugin.getArtifactId(), project.getArtifactId());
-        } else {
-          plugin.setExecutions(plugin.getExecutions().stream().filter(execution -> !SKIPPED_PHASES.contains(execution.getPhase())).collect(Collectors.toList()));
-          LOGGER.info("Removed execution(s) from plugin {} in project {}", plugin.getArtifactId(), project.getArtifactId());
-        }
-      }
-    }
-  }
-
-  private static class MavenExtractedInfo {
-    MavenExtractedInfo(Map<String, MavenTargetInfo> mavenTargets, Map<String, String> reportedDependencies) {
-      this.mavenTargets = mavenTargets;
-      this.reportedDependencies = reportedDependencies;
-    }
-
-    public Map<String, MavenTargetInfo> mavenTargets;
-    public Map<String, String> reportedDependencies;
+    session.getUserProperties().put("mavenTargets", new TreeMap<String, MavenTargetInfo>());
+    session.getUserProperties().put("reportedDependencies", new TreeMap<String, String>());
   }
 
   @SuppressWarnings("unchecked")
@@ -207,7 +209,8 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
 
   @SuppressWarnings("unchecked")
   public File findFileForArtifact(MavenSession session, Artifact artifact) {
-    Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties().get("mavenTargets");
+    Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties()
+        .get("mavenTargets");
     String key = artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + artifact.getVersion();
     MavenTargetInfo mavenTarget = mavenTargets.get(key);
     if (mavenTarget != null) {
