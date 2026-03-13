@@ -16,7 +16,6 @@ public class MBTExtractor {
   public static void main(String[] args) {
     try {
       Path baseDir = Path.of(".").toAbsolutePath().normalize();
-      Path participantJar = MavenBuildRunner.resolveLifecycleParticipantJar(baseDir, args);
 
       List<Path> todo = findPomFilesSortedByPathLength(baseDir);
       if (todo.isEmpty()) {
@@ -35,8 +34,9 @@ public class MBTExtractor {
 
         Path outfile = createUniqueOutfile();
         try {
-          MavenBuildRunner.runBuild(projectDir, participantJar, outfile);
+          MavenBuildRunner.runBuild(projectDir, outfile);
           MavenExtractedInfo extractedInfo = readClasspathJson(gson, outfile);
+          System.out.println("Extracted info for: " + extractedInfo.mavenTargets.size() + " maven targets");
           List<Path> pomPathsFromJson = collectPomPaths(extractedInfo);
           removePomsFromTodo(todo, pomPathsFromJson);
         } finally {

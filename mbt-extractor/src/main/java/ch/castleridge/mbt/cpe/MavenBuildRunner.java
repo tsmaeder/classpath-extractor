@@ -2,8 +2,10 @@ package ch.castleridge.mbt.cpe;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -16,22 +18,31 @@ import org.apache.maven.shared.invoker.Invoker;
 public final class MavenBuildRunner {
 
   private static final String DEFAULT_LIFECYCLE_PARTICIPANT =
-      "lifecycle-participant/target/lifecycle-participant-1.0-SNAPSHOT.jar";
-  private static final String LIFECYCLE_PARTICIPANT_PROPERTY = "mbt.lifecycleParticipant";
+      "lifecycle-participant-1.0-SNAPSHOT.jar";
+  private static final String APP_DATA_DIR_NAME = "mbt-extractor";
 
   private MavenBuildRunner() {
   }
 
-  public static Path resolveLifecycleParticipantJar(Path baseDir, String[] args) {
-    String lifecycleParticipant = getLifecycleParticipantPath(args);
-    Path participantJar = baseDir.resolve(lifecycleParticipant).normalize().toAbsolutePath();
-    if (!Files.isRegularFile(participantJar)) {
-      throw new IllegalArgumentException("Lifecycle participant JAR not found: " + participantJar);
+  public static Path resolveLifecycleParticipantJar() throws IOException {
+    String jarName = Path.of(DEFAULT_LIFECYCLE_PARTICIPANT).getFileName().toString();
+    if (jarName.isEmpty()) {
+      throw new IllegalArgumentException("Invalid lifecycle participant JAR name: " + DEFAULT_LIFECYCLE_PARTICIPANT);
     }
+
+    Path appDataDir = getAppDataDirectory();
+    Files.createDirectories(appDataDir);
+    Path participantJar = appDataDir.resolve(jarName).toAbsolutePath();
+
+    boolean shouldReplace = jarName.contains("SNAPSHOT");
+    if (shouldReplace || !Files.isRegularFile(participantJar)) {
+      copyFromResources(jarName, participantJar);
+    }
+
     return participantJar;
   }
 
-  public static void runBuild(Path projectDir, Path lifecycleParticipantJar, Path outfile)
+  public static void runBuild(Path projectDir, Path outfile)
       throws Exception {
     boolean useWrapper = false;
     Path mvnw = projectDir.resolve("mvnw");
@@ -44,16 +55,16 @@ public final class MavenBuildRunner {
     }
 
     if (useWrapper) {
-      runWithWrapper(projectDir, lifecycleParticipantJar, outfile, windows);
+      runWithWrapper(projectDir, outfile, windows);
     } else {
-      runWithInvoker(projectDir, lifecycleParticipantJar, outfile);
+      runWithInvoker(projectDir, outfile);
     }
   }
 
-  private static void runWithWrapper(Path projectDir, Path lifecycleParticipantJar,
+  private static void runWithWrapper(Path projectDir,
       Path outfile, boolean windows) throws IOException, InterruptedException {
     String outfileAbs = outfile.toAbsolutePath().toString();
-    String jarAbs = lifecycleParticipantJar.toAbsolutePath().toString();
+    String jarAbs = resolveLifecycleParticipantJar().toAbsolutePath().toString();
     List<String> command = new ArrayList<>();
     if (windows) {
       command.add(projectDir.resolve("mvnw.cmd").toAbsolutePath().toString());
@@ -62,6 +73,8 @@ public final class MavenBuildRunner {
     }
     command.add("-Dmaven.ext.class.path=" + jarAbs);
     command.add("-Doutfile=" + outfileAbs);
+    command.add("--fail-never");
+    command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
     command.add("test-compile");
     command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
 
@@ -75,12 +88,12 @@ public final class MavenBuildRunner {
     }
   }
 
-  private static void runWithInvoker(Path projectDir, Path lifecycleParticipantJar,
+  private static void runWithInvoker(Path projectDir,
       Path outfile) throws Exception {
     InvocationRequest request = new DefaultInvocationRequest();
     request.setBaseDirectory(projectDir.toFile());
     request.setPomFile(projectDir.resolve("pom.xml").toFile());
-    request.addArg("-Dmaven.ext.class.path=" + lifecycleParticipantJar.toAbsolutePath());
+    request.addArg("-Dmaven.ext.class.path=" + resolveLifecycleParticipantJar().toAbsolutePath());
     request.addArg("-Doutfile=" + outfile.toAbsolutePath());
     request.setGoals(Arrays.asList("test-compile", "ch.castleridge:classpath-extractor-maven-plugin:extract"));
 
@@ -99,16 +112,39 @@ public final class MavenBuildRunner {
     }
   }
 
-  private static String getLifecycleParticipantPath(String[] args) {
-    String fromProperty = System.getProperty(LIFECYCLE_PARTICIPANT_PROPERTY);
-    if (fromProperty != null && !fromProperty.isEmpty()) {
-      return fromProperty;
-    }
-    for (int i = 0; i < args.length - 1; i++) {
-      if ("--lifecycle-participant".equals(args[i])) {
-        return args[i + 1];
+  private static void copyFromResources(String jarName, Path targetJar) throws IOException {
+    try (InputStream in = MavenBuildRunner.class.getClassLoader().getResourceAsStream(jarName)) {
+      if (in == null) {
+        throw new IllegalArgumentException(
+            "Lifecycle participant JAR not found in application resources: " + jarName);
       }
+      Files.copy(in, targetJar, StandardCopyOption.REPLACE_EXISTING);
     }
-    return DEFAULT_LIFECYCLE_PARTICIPANT;
+  }
+
+  private static Path getAppDataDirectory() {
+    String os = System.getProperty("os.name", "").toLowerCase();
+    String userHome = System.getProperty("user.home", "");
+
+    if (os.contains("win")) {
+      String localAppData = System.getenv("LOCALAPPDATA");
+      if (localAppData != null && !localAppData.isEmpty()) {
+        return Path.of(localAppData, APP_DATA_DIR_NAME);
+      }
+      String appData = System.getenv("APPDATA");
+      if (appData != null && !appData.isEmpty()) {
+        return Path.of(appData, APP_DATA_DIR_NAME);
+      }
+      return Path.of(userHome, "AppData", "Local", APP_DATA_DIR_NAME);
+    }
+    if (os.contains("mac")) {
+      return Path.of(userHome, "Library", "Application Support", APP_DATA_DIR_NAME);
+    }
+
+    String xdgDataHome = System.getenv("XDG_DATA_HOME");
+    if (xdgDataHome != null && !xdgDataHome.isEmpty()) {
+      return Path.of(xdgDataHome, APP_DATA_DIR_NAME);
+    }
+    return Path.of(userHome, ".local", "share", APP_DATA_DIR_NAME);
   }
 }
