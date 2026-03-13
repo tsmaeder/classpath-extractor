@@ -9,7 +9,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -30,76 +29,15 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.stream.JsonWriter;
 
+import ch.castleridge.mbt.cpe.json.MavenExtractedInfo;
+import ch.castleridge.mbt.cpe.json.MavenTargetInfo;
+
 @Named("classpath-extractor")
 @Singleton
 public class ClasspathExtractorParticipant extends AbstractMavenLifecycleParticipant {
 
   ClasspathExtractorParticipant() {
     LOGGER.info("ClasspathExtractorParticipant initialized");
-  }
-
-  public static class MavenExtractedInfo {
-    MavenExtractedInfo(Map<String, MavenTargetInfo> mavenTargets, Map<String, String> reportedDependencies) {
-      this.mavenTargets = mavenTargets;
-      this.reportedDependencies = reportedDependencies;
-    }
-
-    public Map<String, MavenTargetInfo> mavenTargets;
-    public Map<String, String> reportedDependencies;
-  }
-
-  public static class MavenTargetInfo {
-    public MavenTargetInfo(String pom,
-        List<String> inputFolders,
-        String outputFolder,
-        Set<String> dependencies,
-        Set<String> testDependencies,
-        List<String> testInputFolders,
-        String testOutputFolder) {
-      this.pom = pom;
-      this.inputFolders = inputFolders;
-      this.outputFolder = outputFolder;
-      this.dependencies = dependencies;
-      this.testDependencies = testDependencies;
-      this.testInputFolders = testInputFolders;
-      this.testOutputFolder = testOutputFolder;
-    }
-
-    private String pom;
-    private List<String> inputFolders;
-    private String outputFolder;
-    private Set<String> dependencies;
-    private Set<String> testDependencies;
-    private List<String> testInputFolders;
-    private String testOutputFolder;
-
-    public String getPom() {
-      return pom;
-    }
-
-    public List<String> getInputFolders() {
-      return inputFolders;
-    }
-
-    public String getOutputFolder() {
-      return outputFolder;
-    }
-
-    public Set<String> getDependencies() {
-      return dependencies;
-    }
-
-    public Set<String> getTestDependencies() {
-      return testDependencies;
-    }
-
-    public List<String> getTestInputFolders() {
-      return testInputFolders;
-    }
-
-    public String getTestOutputFolder() {
-      return testOutputFolder;
-    }
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClasspathExtractorParticipant.class);
