@@ -13,19 +13,10 @@ import java.util.List;
 
 public class MBTExtractor {
 
-  private static final String DEFAULT_LIFECYCLE_PARTICIPANT =
-      "lifecycle-participant/target/lifecycle-participant-1.0-SNAPSHOT.jar";
-  private static final String LIFECYCLE_PARTICIPANT_PROPERTY = "mbt.lifecycleParticipant";
-
   public static void main(String[] args) {
     try {
-      String lifecycleParticipant = getLifecycleParticipantPath(args);
       Path baseDir = Path.of(".").toAbsolutePath().normalize();
-      Path participantJar = baseDir.resolve(lifecycleParticipant).normalize().toAbsolutePath();
-      if (!Files.isRegularFile(participantJar)) {
-        System.err.println("Lifecycle participant JAR not found: " + participantJar);
-        System.exit(1);
-      }
+      Path participantJar = MavenBuildRunner.resolveLifecycleParticipantJar(baseDir, args);
 
       List<Path> todo = findPomFilesSortedByPathLength(baseDir);
       if (todo.isEmpty()) {
@@ -62,19 +53,6 @@ public class MBTExtractor {
       e.printStackTrace();
       System.exit(1);
     }
-  }
-
-  private static String getLifecycleParticipantPath(String[] args) {
-    String fromProperty = System.getProperty(LIFECYCLE_PARTICIPANT_PROPERTY);
-    if (fromProperty != null && !fromProperty.isEmpty()) {
-      return fromProperty;
-    }
-    for (int i = 0; i < args.length - 1; i++) {
-      if ("--lifecycle-participant".equals(args[i])) {
-        return args[i + 1];
-      }
-    }
-    return DEFAULT_LIFECYCLE_PARTICIPANT;
   }
 
   private static List<Path> findPomFilesSortedByPathLength(Path baseDir) throws IOException {

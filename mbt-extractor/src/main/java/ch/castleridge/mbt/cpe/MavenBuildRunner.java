@@ -15,7 +15,20 @@ import org.apache.maven.shared.invoker.Invoker;
 
 public final class MavenBuildRunner {
 
+  private static final String DEFAULT_LIFECYCLE_PARTICIPANT =
+      "lifecycle-participant/target/lifecycle-participant-1.0-SNAPSHOT.jar";
+  private static final String LIFECYCLE_PARTICIPANT_PROPERTY = "mbt.lifecycleParticipant";
+
   private MavenBuildRunner() {
+  }
+
+  public static Path resolveLifecycleParticipantJar(Path baseDir, String[] args) {
+    String lifecycleParticipant = getLifecycleParticipantPath(args);
+    Path participantJar = baseDir.resolve(lifecycleParticipant).normalize().toAbsolutePath();
+    if (!Files.isRegularFile(participantJar)) {
+      throw new IllegalArgumentException("Lifecycle participant JAR not found: " + participantJar);
+    }
+    return participantJar;
   }
 
   public static void runBuild(Path projectDir, Path lifecycleParticipantJar, Path outfile)
@@ -84,5 +97,18 @@ public final class MavenBuildRunner {
     if (result.getExecutionException() != null) {
       throw result.getExecutionException();
     }
+  }
+
+  private static String getLifecycleParticipantPath(String[] args) {
+    String fromProperty = System.getProperty(LIFECYCLE_PARTICIPANT_PROPERTY);
+    if (fromProperty != null && !fromProperty.isEmpty()) {
+      return fromProperty;
+    }
+    for (int i = 0; i < args.length - 1; i++) {
+      if ("--lifecycle-participant".equals(args[i])) {
+        return args[i + 1];
+      }
+    }
+    return DEFAULT_LIFECYCLE_PARTICIPANT;
   }
 }
