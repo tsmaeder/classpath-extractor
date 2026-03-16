@@ -1,14 +1,13 @@
 package ch.castleridge.mbt.cpe.json;
 
 import java.util.List;
-import java.util.Set;
 
 public class MavenTargetInfo {
   public MavenTargetInfo(String pom,
       List<String> inputFolders,
       String outputFolder,
-      Set<String> dependencies,
-      Set<String> testDependencies,
+      List<String> dependencies,
+      List<String> testDependencies,
       List<String> testInputFolders,
       String testOutputFolder) {
     this.pom = pom;
@@ -23,8 +22,8 @@ public class MavenTargetInfo {
   private String pom;
   private List<String> inputFolders;
   private String outputFolder;
-  private Set<String> dependencies;
-  private Set<String> testDependencies;
+  private List<String> dependencies;
+  private List<String> testDependencies;
   private List<String> testInputFolders;
   private String testOutputFolder;
 
@@ -40,11 +39,11 @@ public class MavenTargetInfo {
     return outputFolder;
   }
 
-  public Set<String> getDependencies() {
+  public List<String> getDependencies() {
     return dependencies;
   }
 
-  public Set<String> getTestDependencies() {
+  public List<String> getTestDependencies() {
     return testDependencies;
   }
 

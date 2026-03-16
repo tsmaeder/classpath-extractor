@@ -1,9 +1,11 @@
 # To Do
 
-- [ ] Support to include/exclude maven plugins and phases in the build
+- [ ] Support to include/exclude maven plugins and phases in the build in build participant
 - [ ] Convert to mbt.json format
-- [ ] Extract maven running support to separate class
-- [ ] Run maven extractor mojo from jar, not installed (use the post-processor)
-- [ ] Copy the lifecycle participant jar to the project resource
-- [ ] Clean extract the "format" json strucs from the lifecycle participant in a separate package
+  - [ ] Add sources jars, etc. to libraries
+  - [ ] Dependency modules are empty right now
+- [ ] Add cmd line arguments to main jar
+- [x] Run maven extractor mojo from jar, not installed (use the post-processor)
+- [x] Copy the lifecycle participant jar to the project resource
+- [x] Cleanup: extract the "format" json strucs from the lifecycle participant in a separate package
  

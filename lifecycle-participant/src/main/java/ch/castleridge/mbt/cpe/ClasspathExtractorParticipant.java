@@ -6,9 +6,11 @@ import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -90,16 +92,14 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   @SuppressWarnings("unchecked")
   public void reportMavenTarget(MavenSession session, String id, MavenTarget mavenTarget) {
     LOGGER.info("Reporting maven target {}", id);
-    Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties()
-        .get("mavenTargets");
-    Map<String, String> reportedDependencies = (Map<String, String>) session.getUserProperties()
-        .get("reportedDependencies");
+    Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties().get("mavenTargets");
+    Map<String, String> reportedDependencies = (Map<String, String>) session.getUserProperties().get("reportedDependencies");
     for (Map.Entry<String, Dependency> dependency : mavenTarget.getDependencies().entrySet()) {
       reportedDependencies.put(dependency.getKey(), dependency.getValue().getPath());
     }
 
-    Set<String> testDependencies = new HashSet<>();
-    Set<String> dependencies = new HashSet<>();
+    List<String> testDependencies = new ArrayList<>();
+    List<String> dependencies = new ArrayList<>();
     for (Map.Entry<String, Dependency> dependency : mavenTarget.getDependencies().entrySet()) {
       if (dependency.getValue().getScope().equals("test")) {
         testDependencies.add(dependency.getKey());

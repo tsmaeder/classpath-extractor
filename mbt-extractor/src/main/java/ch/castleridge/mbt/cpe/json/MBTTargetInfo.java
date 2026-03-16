@@ -7,6 +7,6 @@ public class MBTTargetInfo {
   public String id;
   public Map<String, String> javacOptions;
   public String jdk;
-  public List<String> sources;
+  public List<String> sources; // source folders
   public List<String> dependencyModules;
 }
