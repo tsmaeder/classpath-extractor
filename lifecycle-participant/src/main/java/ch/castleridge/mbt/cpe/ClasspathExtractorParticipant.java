@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -51,9 +52,7 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
       "org.apache.maven.plugins:sortpom-maven-plugin",
       "org.jacoco:jacoco-maven-plugin",
       "org.codehaus.mojo:license-maven-plugin",
-      "com.github.eirslett:frontend-maven-plugin",
-      "org.apache.maven.plugins:maven-compiler-plugin",
-      "com.trinodb:trino-maven-plugin"));
+      "org.apache.maven.plugins:maven-compiler-plugin"));
 
   private static final Set<String> SKIPPED_PHASES = new HashSet<>(Arrays.asList(
       "initialize",
@@ -65,8 +64,16 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
       "test-compile",
       "compile"));
 
+  private static final String SKIP_PHASES_USER_PROPERTY = "skipPhases";
+  private static final String INCLUDE_PHASES_USER_PROPERTY = "includePhases";
+
   @Override
   public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
+    Set<String> skippedPhases = new HashSet<>(getStringListUserProperty(session, SKIP_PHASES_USER_PROPERTY));
+    skippedPhases.addAll(SKIPPED_PHASES);
+    Set<String> includedPhases = new HashSet<>(getStringListUserProperty(session, INCLUDE_PHASES_USER_PROPERTY));
+    skippedPhases.removeAll(includedPhases);
+
     for (MavenProject project : session.getProjects()) {
       Build build = project.getBuild();
       if (build == null || build.getPlugins() == null) {
@@ -78,16 +85,26 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
           continue;
         }
         String pluginKey = plugin.getGroupId() + ":" + plugin.getArtifactId();
-        if (SKIPPED_PLUGIN_ARTIFACT_IDS.contains(pluginKey )) {
+        if (SKIPPED_PLUGIN_ARTIFACT_IDS.contains(pluginKey)) {
           plugin.setExecutions(Collections.emptyList());
           LOGGER.info("Removed execution(s) from plugin {} in project {}", pluginKey, project.getArtifactId());
         } else {
-          plugin.setExecutions(plugin.getExecutions().stream()
-              .filter(execution -> !SKIPPED_PHASES.contains(execution.getPhase())).collect(Collectors.toList()));
-          LOGGER.info("Removed execution(s) from plugin {} in project {}", plugin.getArtifactId(), project.getArtifactId());
+          plugin.setExecutions(plugin.getExecutions().stream().filter(execution -> !skippedPhases.contains(execution.getPhase())).collect(Collectors.toList()));
+          LOGGER.info("Removed execution(s) from plugin {} in project {}", pluginKey, project.getArtifactId());
         }
       }
     }
+  }
+
+  private Collection<String> getStringListUserProperty(MavenSession session, String propertyName) {
+    String userConfiguredStringList = session.getUserProperties().getProperty(propertyName);
+    if (userConfiguredStringList == null || userConfiguredStringList.trim().isEmpty()) {
+      return Collections.emptyList();
+    }
+    
+    return Arrays.stream(userConfiguredStringList.split(","))
+        .filter(phase -> !phase.trim().isEmpty())
+        .collect(Collectors.toList());
   }
 
   @SuppressWarnings("unchecked")
