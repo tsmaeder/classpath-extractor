@@ -45,15 +45,15 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   private static final Logger LOGGER = LoggerFactory.getLogger(ClasspathExtractorParticipant.class);
 
   private static final Set<String> SKIPPED_PLUGIN_ARTIFACT_IDS = new HashSet<>(Arrays.asList(
-      "maven-surefire-plugin",
-      "maven-enforcer-plugin",
-      "maven-checkstyle-plugin",
-      "sortpom-maven-plugin",
-      "jacoco-maven-plugin",
-      "license-maven-plugin",
-      "frontend-maven-plugin",
-      "maven-compiler-plugin",
-      "trino-maven-plugin"));
+      "org.apache.maven.plugins:maven-surefire-plugin",
+      "org.apache.maven.plugins:maven-enforcer-plugin",
+      "org.apache.maven.plugins:maven-checkstyle-plugin",
+      "org.apache.maven.plugins:sortpom-maven-plugin",
+      "org.jacoco:jacoco-maven-plugin",
+      "org.codehaus.mojo:license-maven-plugin",
+      "com.github.eirslett:frontend-maven-plugin",
+      "org.apache.maven.plugins:maven-compiler-plugin",
+      "com.trinodb:trino-maven-plugin"));
 
   private static final Set<String> SKIPPED_PHASES = new HashSet<>(Arrays.asList(
       "initialize",
@@ -77,9 +77,10 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
         if (plugin == null || plugin.getArtifactId() == null) {
           continue;
         }
-        if (SKIPPED_PLUGIN_ARTIFACT_IDS.contains(plugin.getArtifactId())) {
+        String pluginKey = plugin.getGroupId() + ":" + plugin.getArtifactId();
+        if (SKIPPED_PLUGIN_ARTIFACT_IDS.contains(pluginKey )) {
           plugin.setExecutions(Collections.emptyList());
-          LOGGER.info("Removed execution(s) from plugin {} in project {}", plugin.getArtifactId(), project.getArtifactId());
+          LOGGER.info("Removed execution(s) from plugin {} in project {}", pluginKey, project.getArtifactId());
         } else {
           plugin.setExecutions(plugin.getExecutions().stream()
               .filter(execution -> !SKIPPED_PHASES.contains(execution.getPhase())).collect(Collectors.toList()));
