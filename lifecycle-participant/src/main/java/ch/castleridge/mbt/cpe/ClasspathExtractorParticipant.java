@@ -66,6 +66,8 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
 
   private static final String SKIP_PHASES_USER_PROPERTY = "skipPhases";
   private static final String INCLUDE_PHASES_USER_PROPERTY = "includePhases";
+  private static final String SKIP_PLUGINS_USER_PROPERTY = "skipPlugins";
+  private static final String INCLUDE_PLUGINS_USER_PROPERTY = "includePlugins";
 
   @Override
   public void afterProjectsRead(MavenSession session) throws MavenExecutionException {
@@ -74,6 +76,12 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     Set<String> includedPhases = new HashSet<>(getStringListUserProperty(session, INCLUDE_PHASES_USER_PROPERTY));
     skippedPhases.removeAll(includedPhases);
 
+    Set<String> skippedPlugins = new HashSet<>(getStringListUserProperty(session, SKIP_PLUGINS_USER_PROPERTY));
+    skippedPlugins.addAll(SKIPPED_PLUGIN_ARTIFACT_IDS);
+    Set<String> includedPlugins = new HashSet<>(getStringListUserProperty(session, INCLUDE_PLUGINS_USER_PROPERTY));
+    skippedPlugins.removeAll(includedPlugins);
+
+    
     for (MavenProject project : session.getProjects()) {
       Build build = project.getBuild();
       if (build == null || build.getPlugins() == null) {
@@ -85,7 +93,7 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
           continue;
         }
         String pluginKey = plugin.getGroupId() + ":" + plugin.getArtifactId();
-        if (SKIPPED_PLUGIN_ARTIFACT_IDS.contains(pluginKey)) {
+        if (skippedPlugins.contains(pluginKey)) {
           plugin.setExecutions(Collections.emptyList());
           LOGGER.info("Removed execution(s) from plugin {} in project {}", pluginKey, project.getArtifactId());
         } else {
