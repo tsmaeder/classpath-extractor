@@ -1,18 +1,18 @@
 # To Do
 
-- [ ] Support to include/exclude maven plugins and phases in the build in build participant
+- [x] Support to include/exclude maven plugins and phases in the build in build participant
   - [x] phases
   - [x] plugins
-- [ ] Support to include/exclude maven plugins and phases in the excutable jar
+- [x] Support to include/exclude maven plugins and phases in the excutable jar
   - [x] phases
-  - [ ] plugins
+  - [x] plugins
 - [ ] Extract jdk for targets
 - [ ] Convert to mbt.json format
   - [ ] Add source folders of internal dependencies to sourcepath
   - [ ] Add output folder to own dependencies
   - [ ] Add sources jars, etc. to libraries
   - [x] Dependency modules are empty right now
-- [ ] Add cmd line arguments to main jar
+- [x] Add cmd line arguments to main jar
 - [x] Install maven extractor mojo from jar
 - [x] Copy the lifecycle participant jar to the project resource
 - [x] Cleanup: extract the "format" json strucs from the lifecycle participant in a separate package

@@ -27,6 +27,12 @@ public class MBTExtractor {
   private static final String CLASSPATH_EXTRACTOR_MAVEN_PLUGIN = "classpath-extractor-maven-plugin-1.0-SNAPSHOT.jar";
   private static final String APP_DATA_DIR_NAME = "mbt-extractor";
 
+  private static final String[] PROPERTY_PREFIXES = {
+    "skip-phases=",
+    "include-phases=",
+    "skip-plugins=",
+    "include-plugins=",
+  };
 
   public static Path resolveJar(String jarName) throws IOException {
     Path appDataDir = getAppDataDirectory();
@@ -80,6 +86,7 @@ public class MBTExtractor {
   public static void main(String[] args) {
     try {
 
+      List<String> extraArguments = parseExtraArguments(args);
       Map<String, MBTTargetInfo> targets = new TreeMap<>();
       Map<String, MBTDependencyModuleInfo> dependencyModules = new TreeMap<>();
 
@@ -120,6 +127,7 @@ public class MBTExtractor {
             public void runMavenCommand(List<String> command) throws Exception {
               command.add("-Dmaven.ext.class.path=" + resolveJar(LIFECYCLE_PARTICIPANT).toAbsolutePath());
               command.add("-Doutfile=" + outfile.toAbsolutePath());
+              command.addAll(extraArguments);
               command.add("--fail-never");
               command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
               command.add("test-compile");
@@ -236,5 +244,19 @@ public class MBTExtractor {
       Path normalized = todoPath.normalize().toAbsolutePath();
       return pomPathsFromJson.stream().anyMatch(normalized::equals);
     });
+  }
+
+  private static List<String> parseExtraArguments(String[] args) {
+    List<String> result = new ArrayList<>();
+    
+    for (String arg : args) {
+      for (String propertyPrefix : PROPERTY_PREFIXES) {
+        if (arg.startsWith("--" + propertyPrefix+"=")) {
+          result.add("-D" + propertyPrefix + "=" + arg.substring(propertyPrefix.length()+ 3));
+          break;
+        }
+      }
+    }
+    return result;
   }
 }
