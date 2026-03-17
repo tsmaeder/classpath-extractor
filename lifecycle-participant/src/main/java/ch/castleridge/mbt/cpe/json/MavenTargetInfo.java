@@ -9,7 +9,8 @@ public class MavenTargetInfo {
       List<String> dependencies,
       List<String> testDependencies,
       List<String> testInputFolders,
-      String testOutputFolder) {
+      String testOutputFolder,
+      String jdk) {
     this.pom = pom;
     this.inputFolders = inputFolders;
     this.outputFolder = outputFolder;
@@ -17,6 +18,7 @@ public class MavenTargetInfo {
     this.testDependencies = testDependencies;
     this.testInputFolders = testInputFolders;
     this.testOutputFolder = testOutputFolder;
+    this.jdk = jdk;
   }
 
   private String pom;
@@ -26,7 +28,7 @@ public class MavenTargetInfo {
   private List<String> testDependencies;
   private List<String> testInputFolders;
   private String testOutputFolder;
-
+  private String jdk;
   public String getPom() {
     return pom;
   }
@@ -53,5 +55,9 @@ public class MavenTargetInfo {
 
   public String getTestOutputFolder() {
     return testOutputFolder;
+  }
+
+  public String getJdk() {
+    return jdk;
   }
 }
