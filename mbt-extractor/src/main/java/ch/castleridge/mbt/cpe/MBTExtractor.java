@@ -187,6 +187,7 @@ public class MBTExtractor {
       MBTTargetInfo mbtTarget = new MBTTargetInfo();
       mbtTarget.id = id;
       mbtTarget.sources = target.getInputFolders();
+      mbtTarget.classes = List.of(target.getOutputFolder());
       mbtTarget.jdk = target.getJdk();
       List<String> dependencies = new ArrayList<>(target.getDependencies());
       mbtTarget.dependencyModules = dependencies;
@@ -195,6 +196,7 @@ public class MBTExtractor {
       MBTTargetInfo testTarget = new MBTTargetInfo();
       testTarget.id = testId;
       testTarget.sources = target.getTestInputFolders();
+      testTarget.classes = List.of(target.getTestOutputFolder());
       testTarget.jdk = target.getJdk();
       List<String> testDependencies = new ArrayList<>(target.getDependencies());
       testDependencies.addAll(target.getTestDependencies());

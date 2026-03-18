@@ -121,7 +121,9 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties().get("mavenTargets");
     Map<String, String> reportedDependencies = (Map<String, String>) session.getUserProperties().get("reportedDependencies");
     for (Map.Entry<String, Dependency> dependency : mavenTarget.getDependencies().entrySet()) {
-      reportedDependencies.put(dependency.getKey(), dependency.getValue().getPath());
+      if (!mavenTargets.containsKey(dependency.getKey())) {
+        reportedDependencies.put(dependency.getKey(), dependency.getValue().getPath());
+      }
     }
 
     List<String> testDependencies = new ArrayList<>();

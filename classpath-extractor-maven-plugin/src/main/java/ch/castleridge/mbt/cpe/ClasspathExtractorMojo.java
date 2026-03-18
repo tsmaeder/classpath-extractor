@@ -45,7 +45,7 @@ public class ClasspathExtractorMojo extends AbstractMojo {
     }
     Map<String, Dependency> dependencies = new HashMap<>();
     for (Artifact dep : project.getArtifacts()) {
-      String key = dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getVersion();
+      String key = dep.getGroupId() + ":" + dep.getArtifactId() + ":" + dep.getBaseVersion();
       dependencies.put(key, new Dependency(dep.getFile().toString(), dep.getScope()));
     }
 

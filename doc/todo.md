@@ -6,10 +6,10 @@
 - [x] Support to include/exclude maven plugins and phases in the excutable jar
   - [x] phases
   - [x] plugins
-- [ ] Extract jdk for targets
+- [x] Extract jdk for targets
 - [ ] Convert to mbt.json format
   - [ ] Add source folders of internal dependencies to sourcepath
-  - [ ] Add output folder to own dependencies
+  - [x] Add output folder to own dependencies
   - [ ] Add sources jars, etc. to libraries
   - [x] Dependency modules are empty right now
 - [x] Add cmd line arguments to main jar
