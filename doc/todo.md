@@ -16,3 +16,4 @@
 - [x] Install maven extractor mojo from jar
 - [x] Copy the lifecycle participant jar to the project resource
 - [x] Cleanup: extract the "format" json strucs from the lifecycle participant in a separate package
+- [x] Extract compiler args from config
