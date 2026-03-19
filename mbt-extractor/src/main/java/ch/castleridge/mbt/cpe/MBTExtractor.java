@@ -186,6 +186,7 @@ public class MBTExtractor {
       MavenTargetInfo target = entry.getValue();
       MBTTargetInfo mbtTarget = new MBTTargetInfo();
       mbtTarget.id = id;
+      mbtTarget.javacOptions = target.getCompileJavacOptions();
       mbtTarget.sources = target.getInputFolders();
       mbtTarget.classes = List.of(target.getOutputFolder());
       mbtTarget.jdk = target.getJdk();
@@ -195,6 +196,7 @@ public class MBTExtractor {
       
       MBTTargetInfo testTarget = new MBTTargetInfo();
       testTarget.id = testId;
+      testTarget.javacOptions = target.getTestCompileJavacOptions();
       testTarget.sources = target.getTestInputFolders();
       testTarget.classes = List.of(target.getTestOutputFolder());
       testTarget.jdk = target.getJdk();

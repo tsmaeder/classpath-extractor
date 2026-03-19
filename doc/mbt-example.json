@@ -2,9 +2,10 @@
     "targets": [
         {
             "id": "org.apache.maven:maven-core:3.9.12-SNAPSHOT:main",
-            "javacOptions": {
-                "--add-exports": "xyz"
-            },
+            "javacOptions": [
+                "--add-exports",
+                "xyz"
+            ],
             "jdk": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.8.9-hotspot",
             "sources": [
                 "D:\\anysphere\\maven\\maven-core\\src\\main\\java",
