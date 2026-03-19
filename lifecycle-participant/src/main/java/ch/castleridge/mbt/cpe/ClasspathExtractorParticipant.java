@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,9 +71,8 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   private static final String SKIP_PLUGINS_USER_PROPERTY = "skipPlugins";
   private static final String INCLUDE_PLUGINS_USER_PROPERTY = "includePlugins";
   private static final String COMPILER_PLUGIN_KEY = "org.apache.maven.plugins:maven-compiler-plugin";
-  private static final String JAVAC_OPTIONS_USER_PROPERTY = "javacOptionsByProject";
-  private static final String COMPILE_OPTIONS_KEY = "compile";
-  private static final String TEST_COMPILE_OPTIONS_KEY = "testCompile";
+  private static final String COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY = "compileOptionsByProject";
+  private static final String DEBUG_COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY = "debugCompileOptionsByProject";
   private static final MavenCompilerOptionsExtractor COMPILER_OPTIONS_EXTRACTOR = new MavenCompilerOptionsExtractor();
 
   @Override
@@ -88,7 +86,8 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     skippedPlugins.addAll(SKIPPED_PLUGIN_ARTIFACT_IDS);
     Set<String> includedPlugins = new HashSet<>(getStringListUserProperty(session, INCLUDE_PLUGINS_USER_PROPERTY));
     skippedPlugins.removeAll(includedPlugins);
-    Map<String, Map<String, List<String>>> javacOptionsByProject = new TreeMap<>();
+    Map<String, List<String>> compileOptionsByProject = new TreeMap<>();
+    Map<String, List<String>> debugCompileOptionsByProject = new TreeMap<>();
 
     
     for (MavenProject project : session.getProjects()) {
@@ -103,8 +102,8 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
       for (Plugin plugin : build.getPlugins()) {
         String pluginKey = plugin.getGroupId() + ":" + plugin.getArtifactId();
         if (COMPILER_PLUGIN_KEY.equals(pluginKey)) {
-          Map<String, List<String>> javacOptions = extractJavacOptions(plugin);
-          javacOptionsByProject.put(projectId, javacOptions);
+          compileOptionsByProject.put(projectId, extractCompileJavacOptions(plugin));
+          debugCompileOptionsByProject.put(projectId, extractDebugCompileJavacOptions(plugin));
         }
         if (skippedPlugins.contains(pluginKey)) {
           plugin.setExecutions(Collections.emptyList());
@@ -116,7 +115,8 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
       }
     }
 
-    session.getUserProperties().put(JAVAC_OPTIONS_USER_PROPERTY, javacOptionsByProject);
+    session.getUserProperties().put(COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, compileOptionsByProject);
+    session.getUserProperties().put(DEBUG_COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, debugCompileOptionsByProject);
   }
 
   private Collection<String> getStringListUserProperty(MavenSession session, String propertyName) {
@@ -162,7 +162,8 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   public void afterSessionStart(MavenSession session) throws MavenExecutionException {
     session.getUserProperties().put("mavenTargets", new TreeMap<String, MavenTargetInfo>());
     session.getUserProperties().put("reportedDependencies", new TreeMap<String, String>());
-    session.getUserProperties().put(JAVAC_OPTIONS_USER_PROPERTY, new TreeMap<String, Map<String, List<String>>>());
+    session.getUserProperties().put(COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, new TreeMap<String, List<String>>());
+    session.getUserProperties().put(DEBUG_COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, new TreeMap<String, List<String>>());
   }
 
   @SuppressWarnings("unchecked")
@@ -209,48 +210,52 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
 
   @SuppressWarnings("unchecked")
   private List<String> getCompileJavacOptions(MavenSession session, String id) {
-    Map<String, Map<String, List<String>>> optionsByProject = (Map<String, Map<String, List<String>>>) session
+    Map<String, List<String>> optionsByProject = (Map<String, List<String>>) session
         .getUserProperties()
-        .get(JAVAC_OPTIONS_USER_PROPERTY);
+        .get(COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY);
     if (optionsByProject == null) {
       return Collections.emptyList();
     }
-    Map<String, List<String>> options = optionsByProject.get(id);
-    if (options == null) {
+    List<String> compileOptions = optionsByProject.get(id);
+    if (compileOptions == null) {
       return Collections.emptyList();
     }
-    List<String> compileOptions = options.get(COMPILE_OPTIONS_KEY);
-    return compileOptions == null ? Collections.emptyList() : new ArrayList<>(compileOptions);
+    return new ArrayList<>(compileOptions);
   }
 
   @SuppressWarnings("unchecked")
   private List<String> getTestCompileJavacOptions(MavenSession session, String id) {
-    Map<String, Map<String, List<String>>> optionsByProject = (Map<String, Map<String, List<String>>>) session
+    Map<String, List<String>> optionsByProject = (Map<String, List<String>>) session
         .getUserProperties()
-        .get(JAVAC_OPTIONS_USER_PROPERTY);
+        .get(DEBUG_COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY);
     if (optionsByProject == null) {
       return Collections.emptyList();
     }
-    Map<String, List<String>> options = optionsByProject.get(id);
-    if (options == null) {
+    List<String> testCompileOptions = optionsByProject.get(id);
+    if (testCompileOptions == null) {
       return Collections.emptyList();
     }
-    List<String> testCompileOptions = options.get(TEST_COMPILE_OPTIONS_KEY);
-    return testCompileOptions == null ? Collections.emptyList() : new ArrayList<>(testCompileOptions);
+    return new ArrayList<>(testCompileOptions);
   }
 
-  private Map<String, List<String>> extractJavacOptions(Plugin plugin) {
-    Map<String, List<String>> options = new LinkedHashMap<>();
-      for (PluginExecution execution : plugin.getExecutions()) {
-
-        if (isCompileExecution(execution)) {
-          options.put(COMPILE_OPTIONS_KEY, extractJavacOptionsFromExecution(execution));
-        }
-        if (isTestCompileExecution(execution)) {
-          options.put(TEST_COMPILE_OPTIONS_KEY, extractJavacOptionsFromExecution(execution));
-        }
+  private List<String> extractCompileJavacOptions(Plugin plugin) {
+    List<String> options = Collections.emptyList();
+    for (PluginExecution execution : plugin.getExecutions()) {
+      if (isCompileExecution(execution)) {
+        options = extractJavacOptionsFromExecution(execution);
       }
-      return options;
+    }
+    return options;
+  }
+
+  private List<String> extractDebugCompileJavacOptions(Plugin plugin) {
+    List<String> options = Collections.emptyList();
+    for (PluginExecution execution : plugin.getExecutions()) {
+      if (isTestCompileExecution(execution)) {
+        options = extractJavacOptionsFromExecution(execution);
+      }
+    }
+    return options;
   }
 
   private List<String> extractJavacOptionsFromExecution(PluginExecution execution) {
