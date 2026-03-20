@@ -54,6 +54,7 @@ public class ClasspathExtractorMojo extends AbstractMojo {
         project.getBuild().getOutputDirectory(),
         project.getTestCompileSourceRoots(),
         project.getBuild().getTestOutputDirectory(),
+        project.getBuild().getDirectory(),
         getJavaHome(),
         dependencies);
     String id = project.getGroupId() + ":" + project.getArtifactId() + ":" + project.getVersion();

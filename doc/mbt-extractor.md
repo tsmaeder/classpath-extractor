@@ -3,7 +3,7 @@
 The main class in MBTExtractor.java should implement the following algorigthm:
 
 1. In the current directory, recursively find all files called "pom.xml" and sort them by path length ascending. We call this list the "todo list"
-2. Take (and remove) the first file from the list and run a maven build in the parent directory of the file as follows:
+2. Take (and remove) the first file from the list. Skip it if it lies under a Maven build output directory already learned from a previous run (the parent of each reactor project's compile or test output directory, typically `target/`). Otherwise run a maven build in the parent directory of the file as follows:
     a. If the directory contains a maven wrapper (mvn or mvn.cmd), use the wrapper script to invoke maven, otherwise use an instance of the mvn cli (add a dependency to the cli to the MBTExtractor pom file)
     b. the invocation should have the following parameters: `mvn -Dmaven.ext.class.path=<lifecylceparticipant.jar> -Doutfile=<a unique path>.json test-compile ch.castleridge:classpath-extractor-maven-plugin:extract`
     c. Read the resulting file into Java Objects using the GSON library. There is an example of such a file next to this file called classpath.json

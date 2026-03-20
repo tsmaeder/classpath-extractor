@@ -18,9 +18,12 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 public class MBTExtractor {
   private static final String LIFECYCLE_PARTICIPANT = "lifecycle-participant-1.0-SNAPSHOT.jar";
@@ -33,6 +36,19 @@ public class MBTExtractor {
     "skip-plugins=",
     "include-plugins=",
   };
+
+  private final List<String> extraArguments;
+  private final Gson gson = new Gson();
+  private final Map<String, MBTTargetInfo> targets = new TreeMap<>();
+  private final Map<String, MBTDependencyModuleInfo> dependencyModules = new TreeMap<>();
+  private final Set<Path> mavenBuildOutputRoots = new HashSet<>();
+
+  private Path baseDir;
+  private List<Path> todo;
+
+  public MBTExtractor(String[] args) {
+    this.extraArguments = parseExtraArguments(args);
+  }
 
   public static Path resolveJar(String jarName) throws IOException {
     Path appDataDir = getAppDataDirectory();
@@ -83,94 +99,91 @@ public class MBTExtractor {
     return Path.of(userHome, ".local", "share", APP_DATA_DIR_NAME);
   }
 
-  public static void main(String[] args) {
-    try {
-
-      List<String> extraArguments = parseExtraArguments(args);
-      Map<String, MBTTargetInfo> targets = new TreeMap<>();
-      Map<String, MBTDependencyModuleInfo> dependencyModules = new TreeMap<>();
-
-      Path baseDir = Path.of(".").toAbsolutePath().normalize();
-
-      List<Path> todo = findPomFilesSortedByPathLength(baseDir);
-      if (todo.isEmpty()) {
-        System.out.println("No pom.xml files found.");
-        return;
-      }
-
-      MavenBuildRunner.runMaven(baseDir, new InnerMavenBuildRunner() {
-        @Override
-        public void runMavenCommand(List<String> command) throws Exception {
-          
-          command.add("install:install-file");
-          command.add("-Dfile=" + resolveJar(CLASSPATH_EXTRACTOR_MAVEN_PLUGIN).toAbsolutePath());
-          command.add("-DgroupId=ch.castleridge");
-          command.add("-DartifactId=classpath-extractor-maven-plugin");
-          command.add("-Dversion=1.0-SNAPSHOT");
-          command.add("-Dpackaging=maven-plugin");
-        }
-      });
-
-      Gson gson = new Gson();
-
-      while (!todo.isEmpty()) {
-        Path pomPath = todo.remove(0);
-        Path projectDir = pomPath.getParent();
-        if (projectDir == null) {
-          continue;
-        }
-
-        Path outfile = createUniqueOutfile();
-        try {
-          MavenBuildRunner.runMaven(projectDir, new InnerMavenBuildRunner() {
-            @Override
-            public void runMavenCommand(List<String> command) throws Exception {
-              command.add("-Dmaven.ext.class.path=" + resolveJar(LIFECYCLE_PARTICIPANT).toAbsolutePath());
-              command.add("-Doutfile=" + outfile.toAbsolutePath());
-              command.addAll(extraArguments);
-              command.add("--fail-never");
-              command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
-              command.add("test-compile");
-              command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
-            }
-          });
-          MavenExtractedInfo extractedInfo = readClasspathJson(gson, outfile);
-          if (extractedInfo != null) {
-            System.out.println("Extracted info for: " + extractedInfo.mavenTargets.size() + " maven targets");
-            List<Path> pomPathsFromJson = collectPomPaths(extractedInfo);
-            removePomsFromTodo(todo, pomPathsFromJson);
-            extractTargets(targets, extractedInfo);
-            dependencyModules.putAll(mapDependencyModules(extractedInfo.reportedDependencies));
-          } else {
-            System.err.println("No extracted info for: " + projectDir);
-          }
-        } finally {
-          try {
-            Files.deleteIfExists(outfile);
-          } catch (IOException ignored) {
-            // best-effort cleanup
-          }
-        }
-      }
-
-      MBTInfo mbtInfo = new MBTInfo(targets.values(), dependencyModules.values());
-            try (JsonWriter writer = gson.newJsonWriter(Files.newBufferedWriter(Path.of("mbt.json"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
-              writer.setIndent("  ");
-              gson.toJson(mbtInfo, MBTInfo.class, writer);
-            } catch (IOException e) {
-              System.err.println("Failed to write mbt.json to file: " + e.getMessage());
-            }
-
-      System.out.println("MBT extraction complete.");
-    } catch (Exception e) {
-      e.printStackTrace();
-      System.exit(1);
-    }
+  public static void main(String[] args) throws Exception {
+    new MBTExtractor(args).run();
   }
 
-  private static Map<String, MBTDependencyModuleInfo> mapDependencyModules(Map<String,String> reportedDependencies) {
+  private void run() throws Exception {
+    baseDir = Path.of(".").toAbsolutePath().normalize();
+
+    todo = findPomFilesSortedByPathLength();
+    if (todo.isEmpty()) {
+      System.out.println("No pom.xml files found.");
+      return;
+    }
+
+    MavenBuildRunner.runMaven(baseDir, new InnerMavenBuildRunner() {
+      @Override
+      public void runMavenCommand(List<String> command) throws Exception {
+
+        command.add("install:install-file");
+        command.add("-Dfile=" + resolveJar(CLASSPATH_EXTRACTOR_MAVEN_PLUGIN).toAbsolutePath());
+        command.add("-DgroupId=ch.castleridge");
+        command.add("-DartifactId=classpath-extractor-maven-plugin");
+        command.add("-Dversion=1.0-SNAPSHOT");
+        command.add("-Dpackaging=maven-plugin");
+      }
+    });
+
+    while (!todo.isEmpty()) {
+      Path pomPath = todo.remove(0);
+      Path pomAbsolute = pomPath.normalize().toAbsolutePath();
+      if (isUnderAnyMavenBuildOutputRoot(pomAbsolute)) {
+        continue;
+      }
+      Path projectDir = pomAbsolute.getParent();
+      if (projectDir == null) {
+        continue;
+      }
+
+      Path outfile = createUniqueOutfile();
+      try {
+        MavenBuildRunner.runMaven(projectDir, new InnerMavenBuildRunner() {
+          @Override
+          public void runMavenCommand(List<String> command) throws Exception {
+            command.add("-Dmaven.ext.class.path=" + resolveJar(LIFECYCLE_PARTICIPANT).toAbsolutePath());
+            command.add("-Doutfile=" + outfile.toAbsolutePath());
+            command.addAll(extraArguments);
+            command.add("--fail-never");
+            command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
+            command.add("test-compile");
+            command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
+          }
+        });
+        MavenExtractedInfo extractedInfo = readClasspathJson(outfile);
+        if (extractedInfo != null) {
+          System.out.println("Extracted info for: " + extractedInfo.mavenTargets.size() + " maven targets");
+          List<Path> pomPathsFromJson = collectPomPaths(extractedInfo);
+          removePomsFromTodo(pomPathsFromJson);
+          registerMavenBuildOutputRoots(extractedInfo);
+          extractTargets(extractedInfo);
+          dependencyModules.putAll(mapDependencyModules(extractedInfo.reportedDependencies));
+        } else {
+          System.err.println("No extracted info for: " + projectDir);
+        }
+      } finally {
+        try {
+          Files.deleteIfExists(outfile);
+        } catch (IOException ignored) {
+          // best-effort cleanup
+        }
+      }
+    }
+
+    MBTInfo mbtInfo = new MBTInfo(targets.values(), dependencyModules.values());
+    try (JsonWriter writer = gson.newJsonWriter(Files.newBufferedWriter(Path.of("mbt.json"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
+      writer.setIndent("  ");
+      gson.toJson(mbtInfo, MBTInfo.class, writer);
+    } catch (IOException e) {
+      System.err.println("Failed to write mbt.json to file: " + e.getMessage());
+    }
+
+    System.out.println("MBT extraction complete.");
+  }
+
+  private Map<String, MBTDependencyModuleInfo> mapDependencyModules(Map<String, String> reportedDependencies) {
     Map<String, MBTDependencyModuleInfo> result = new HashMap<>();
-    for (Map.Entry<String,String> entry : reportedDependencies.entrySet()) {
+    for (Map.Entry<String, String> entry : reportedDependencies.entrySet()) {
       MBTDependencyModuleInfo dependencyModule = new MBTDependencyModuleInfo();
       dependencyModule.id = entry.getKey();
       dependencyModule.path = entry.getValue();
@@ -179,7 +192,7 @@ public class MBTExtractor {
     return result;
   }
 
-  private static void extractTargets(Map<String, MBTTargetInfo> targets, MavenExtractedInfo extractedInfo) {
+  private void extractTargets(MavenExtractedInfo extractedInfo) {
     for (Map.Entry<String, MavenTargetInfo> entry : extractedInfo.mavenTargets.entrySet()) {
       String id = entry.getKey();
       String testId = id + ":test";
@@ -193,7 +206,7 @@ public class MBTExtractor {
       List<String> dependencies = new ArrayList<>(target.getDependencies());
       mbtTarget.dependencyModules = dependencies;
       targets.put(id, mbtTarget);
-      
+
       MBTTargetInfo testTarget = new MBTTargetInfo();
       testTarget.id = testId;
       testTarget.javacOptions = target.getTestCompileJavacOptions();
@@ -207,7 +220,7 @@ public class MBTExtractor {
     }
   }
 
-  private static List<Path> findPomFilesSortedByPathLength(Path baseDir) throws IOException {
+  private List<Path> findPomFilesSortedByPathLength() throws IOException {
     List<Path> poms = new ArrayList<>();
     try (var stream = Files.find(baseDir, Integer.MAX_VALUE,
         (p, attrs) -> attrs.isRegularFile() && p.getFileName().toString().equals("pom.xml"))) {
@@ -221,14 +234,13 @@ public class MBTExtractor {
     return Files.createTempFile("classpath", ".json");
   }
 
-  private static MavenExtractedInfo readClasspathJson(Gson gson, Path outfile)
-      throws IOException {
+  private MavenExtractedInfo readClasspathJson(Path outfile) throws IOException {
     try (Reader reader = Files.newBufferedReader(outfile)) {
       return gson.fromJson(reader, MavenExtractedInfo.class);
     }
   }
 
-  private static List<Path> collectPomPaths(MavenExtractedInfo extractedInfo) {
+  private List<Path> collectPomPaths(MavenExtractedInfo extractedInfo) {
     List<Path> result = new ArrayList<>();
     if (extractedInfo == null) {
       return result;
@@ -241,7 +253,7 @@ public class MBTExtractor {
     return result;
   }
 
-  private static void removePomsFromTodo(List<Path> todo, List<Path> pomPathsFromJson) {
+  private void removePomsFromTodo(List<Path> pomPathsFromJson) {
     if (pomPathsFromJson == null || pomPathsFromJson.isEmpty()) {
       return;
     }
@@ -251,13 +263,30 @@ public class MBTExtractor {
     });
   }
 
+  /**
+   * Registers Maven {@code build.directory} roots (parent of compile/test output dirs) for each
+   * reactor project so {@code pom.xml} files unpacked under {@code target/} are skipped later.
+   */
+  private void registerMavenBuildOutputRoots(MavenExtractedInfo extractedInfo) {
+    this.mavenBuildOutputRoots.addAll(extractedInfo.mavenTargets.values().stream().map(MavenTargetInfo::getBuildDirectory).map(Path::of).collect(Collectors.toSet()));
+  }
+
+  private boolean isUnderAnyMavenBuildOutputRoot(Path pomFileAbsolute) {
+    for (Path root : mavenBuildOutputRoots) {
+      if (pomFileAbsolute.startsWith(root)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private static List<String> parseExtraArguments(String[] args) {
     List<String> result = new ArrayList<>();
-    
+
     for (String arg : args) {
       for (String propertyPrefix : PROPERTY_PREFIXES) {
-        if (arg.startsWith("--" + propertyPrefix+"=")) {
-          result.add("-D" + propertyPrefix + "=" + arg.substring(propertyPrefix.length()+ 3));
+        if (arg.startsWith("--" + propertyPrefix + "=")) {
+          result.add("-D" + propertyPrefix + "=" + arg.substring(propertyPrefix.length() + 3));
           break;
         }
       }

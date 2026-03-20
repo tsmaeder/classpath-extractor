@@ -10,6 +10,7 @@ public class MavenTarget {
     private List<String> testInputFolders;
     private String testOutputFolder;
     private java.util.Map<String, Dependency> dependencies;
+    private String buildDirectory;
     private String jdk;
 
     public MavenTarget(
@@ -18,14 +19,16 @@ public class MavenTarget {
         String outputFolder,
         List<String> testInputFolders,
         String testOutputFolder,
+        String buildDirectory,
         String jdk,
         java.util.Map<String, Dependency> dependencies
     ) {
         this.pom = pom;
         this.inputFolders = inputFolders;
         this.outputFolder = outputFolder;
-        this.jdk = jdk;
+        this.buildDirectory = buildDirectory;
         this.dependencies = dependencies;
+        this.jdk = jdk;
         this.testInputFolders = testInputFolders;
         this.testOutputFolder = testOutputFolder;
     }
@@ -39,6 +42,10 @@ public class MavenTarget {
 
     public String getOutputFolder() {
         return outputFolder;
+    }
+
+    public String getBuildDirectory() {
+        return buildDirectory;
     }
 
     public String getJdk() {

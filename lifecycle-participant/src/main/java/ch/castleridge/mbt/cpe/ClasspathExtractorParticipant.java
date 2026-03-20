@@ -154,7 +154,7 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     mavenTargets.put(id,
         new MavenTargetInfo(mavenTarget.getPom(), mavenTarget.getInputFolders(), mavenTarget.getOutputFolder(),
             dependencies, testDependencies, mavenTarget.getTestInputFolders(), mavenTarget.getTestOutputFolder(),
-            mavenTarget.getJdk(), getCompileJavacOptions(session, id), getTestCompileJavacOptions(session, id)));
+            mavenTarget.getBuildDirectory(), mavenTarget.getJdk(), getCompileJavacOptions(session, id), getTestCompileJavacOptions(session, id)));
     LOGGER.info("Maven target {} reported, now have {} maven targets", id, mavenTargets.size());
   }
 

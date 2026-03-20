@@ -10,6 +10,7 @@ public class MavenTargetInfo {
       List<String> testDependencies,
       List<String> testInputFolders,
       String testOutputFolder,
+      String buildDirectory,
       String jdk,
       List<String> compileJavacOptions,
       List<String> testCompileJavacOptions) {
@@ -20,6 +21,7 @@ public class MavenTargetInfo {
     this.testDependencies = testDependencies;
     this.testInputFolders = testInputFolders;
     this.testOutputFolder = testOutputFolder;
+    this.buildDirectory = buildDirectory;
     this.jdk = jdk;
     this.compileJavacOptions = compileJavacOptions;
     this.testCompileJavacOptions = testCompileJavacOptions;
@@ -35,6 +37,7 @@ public class MavenTargetInfo {
   private String jdk;
   private List<String> compileJavacOptions;
   private List<String> testCompileJavacOptions;
+  private String buildDirectory;
   public String getPom() {
     return pom;
   }
@@ -73,5 +76,9 @@ public class MavenTargetInfo {
 
   public List<String> getTestCompileJavacOptions() {
     return testCompileJavacOptions;
+  }
+
+  public String getBuildDirectory() {
+    return buildDirectory;
   }
 }
