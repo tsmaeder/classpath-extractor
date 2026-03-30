@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 Anysphere, Inc.
+ *
+ * @author Thomas Mäder
+ */
 package ch.castleridge.mbt.cpe;
 
 import java.io.File;
