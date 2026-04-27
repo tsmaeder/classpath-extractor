@@ -8,7 +8,6 @@ package ch.castleridge.mbt.cpe;
 import com.google.gson.Gson;
 import com.google.gson.stream.JsonWriter;
 
-import ch.castleridge.mbt.cpe.MavenBuildRunner.InnerMavenBuildRunner;
 import ch.castleridge.mbt.cpe.json.MBTDependencyModuleInfo;
 import ch.castleridge.mbt.cpe.json.MBTInfo;
 import ch.castleridge.mbt.cpe.json.MBTTargetInfo;
@@ -50,6 +49,7 @@ public class MBTExtractor {
 
   private Path baseDir;
   private List<Path> todo;
+  private String profileFile;
 
   public MBTExtractor(String[] args) {
     this.extraArguments = parseExtraArguments(args);
@@ -117,17 +117,13 @@ public class MBTExtractor {
       return;
     }
 
-    MavenBuildRunner.runMaven(baseDir, new InnerMavenBuildRunner() {
-      @Override
-      public void runMavenCommand(List<String> command) throws Exception {
-
+    MavenBuildRunner.runMaven(baseDir, null, (List<String> command) -> {
         command.add("install:install-file");
         command.add("-Dfile=" + resolveJar(CLASSPATH_EXTRACTOR_MAVEN_PLUGIN).toAbsolutePath());
         command.add("-DgroupId=ch.castleridge");
         command.add("-DartifactId=classpath-extractor-maven-plugin");
         command.add("-Dversion=1.0-SNAPSHOT");
         command.add("-Dpackaging=maven-plugin");
-      }
     });
 
     while (!todo.isEmpty()) {
@@ -143,17 +139,14 @@ public class MBTExtractor {
 
       Path outfile = createUniqueOutfile();
       try {
-        MavenBuildRunner.runMaven(projectDir, new InnerMavenBuildRunner() {
-          @Override
-          public void runMavenCommand(List<String> command) throws Exception {
-            command.add("-Dmaven.ext.class.path=" + resolveJar(LIFECYCLE_PARTICIPANT).toAbsolutePath());
-            command.add("-Doutfile=" + outfile.toAbsolutePath());
-            command.addAll(extraArguments);
-            command.add("--fail-never");
-            command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
-            command.add("test-compile");
-            command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
-          }
+        MavenBuildRunner.runMaven(projectDir, profileFile, (List<String> command) -> {
+          command.add("-Dmaven.ext.class.path=" + resolveJar(LIFECYCLE_PARTICIPANT).toAbsolutePath());
+          command.add("-Doutfile=" + outfile.toAbsolutePath());
+          command.addAll(extraArguments);
+          command.add("--fail-never");
+          command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
+          command.add("test-compile");
+          command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
         });
         MavenExtractedInfo extractedInfo = readClasspathJson(outfile);
         if (extractedInfo != null) {
@@ -285,7 +278,7 @@ public class MBTExtractor {
     return false;
   }
 
-  private static List<String> parseExtraArguments(String[] args) {
+  private List<String> parseExtraArguments(String[] args) {
     List<String> result = new ArrayList<>();
 
     for (String arg : args) {
@@ -294,6 +287,14 @@ public class MBTExtractor {
           result.add("-D" + propertyPrefix + "=" + arg.substring(propertyPrefix.length() + 3));
           break;
         }
+      }
+      if (arg.startsWith("--profile=")) {
+        profileFile = arg.substring("--profile=".length());
+        if (profileFile.isBlank()) {
+          profileFile="mbt.jfr";
+        }
+      } else if (arg.equals("--profile")) {
+        profileFile="mbt.jfr";
       }
     }
     return result;

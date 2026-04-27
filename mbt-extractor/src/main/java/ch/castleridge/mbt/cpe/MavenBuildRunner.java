@@ -11,13 +11,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MavenBuildRunner {
-  public static interface InnerMavenBuildRunner {
-    void runMavenCommand(List<String> command) throws Exception;
+  public static interface MavenCommandCompleter {
+    void completeMavenCommand(List<String> command) throws Exception;
   }
   private MavenBuildRunner() {
   }
 
-  public static void runMaven(Path projectDir, InnerMavenBuildRunner mavenBuildRunner)
+  public static void runMaven(Path projectDir, String profileFile, MavenCommandCompleter commandCompleter)
       throws Exception {
     Path mvnw = projectDir.resolve("mvnw");
     Path mvnwCmd = projectDir.resolve("mvnw.cmd");
@@ -43,9 +43,12 @@ public final class MavenBuildRunner {
       }
     }
 
-    mavenBuildRunner.runMavenCommand(command);
+    commandCompleter.completeMavenCommand(command);
 
     ProcessBuilder pb = new ProcessBuilder(command);
+    if (profileFile != null) {
+      pb.environment().put("MAVEN_OPTS", "-XX:StartFlightRecording=filename=" + profileFile);
+    }
     pb.directory(projectDir.toFile());
     pb.inheritIO();
     Process process = pb.start();
