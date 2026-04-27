@@ -168,7 +168,8 @@ public class MBTExtractor {
       }
     }
 
-    MBTInfo mbtInfo = new MBTInfo(targets.values(), dependencyModules.values());
+    
+    MBTInfo mbtInfo = new MBTInfo(targets, dependencyModules.values());
     try (JsonWriter writer = gson.newJsonWriter(Files.newBufferedWriter(Path.of("mbt.json"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
       writer.setIndent("  ");
       gson.toJson(mbtInfo, MBTInfo.class, writer);
@@ -196,21 +197,19 @@ public class MBTExtractor {
       String testId = id + ":test";
       MavenTargetInfo target = entry.getValue();
       MBTTargetInfo mbtTarget = new MBTTargetInfo();
-      mbtTarget.id = id;
-      mbtTarget.javacOptions = target.getCompileJavacOptions();
+      mbtTarget.compilerOptions = target.getCompileJavacOptions();
       mbtTarget.sources = target.getInputFolders();
       mbtTarget.classes = List.of(target.getOutputFolder());
-      mbtTarget.jdk = target.getJdk();
+      mbtTarget.javaHome = target.getJdk();
       List<String> dependencies = new ArrayList<>(target.getDependencies());
       mbtTarget.dependencyModules = dependencies;
       targets.put(id, mbtTarget);
 
       MBTTargetInfo testTarget = new MBTTargetInfo();
-      testTarget.id = testId;
-      testTarget.javacOptions = target.getTestCompileJavacOptions();
+      testTarget.compilerOptions = target.getTestCompileJavacOptions();
       testTarget.sources = target.getTestInputFolders();
       testTarget.classes = List.of(target.getTestOutputFolder());
-      testTarget.jdk = target.getJdk();
+      testTarget.javaHome = target.getJdk();
       List<String> testDependencies = new ArrayList<>(target.getDependencies());
       testDependencies.addAll(target.getTestDependencies());
       testTarget.dependencyModules = testDependencies;

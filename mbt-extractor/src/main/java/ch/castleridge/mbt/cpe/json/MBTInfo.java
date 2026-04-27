@@ -6,13 +6,14 @@
 package ch.castleridge.mbt.cpe.json;
 
 import java.util.Collection;
+import java.util.Map;
 
 public class MBTInfo {
-  public MBTInfo(Collection<MBTTargetInfo> targets, Collection<MBTDependencyModuleInfo> dependencyModules) {
-    this.targets = targets;
+  public MBTInfo(Map<String, MBTTargetInfo> targets, Collection<MBTDependencyModuleInfo> dependencyModules) {
+    this.namespaces = targets;
     this.dependencyModules = dependencyModules;
   }
 
-  public Collection<MBTTargetInfo> targets;
+  public Map<String, MBTTargetInfo> namespaces;
   public Collection<MBTDependencyModuleInfo> dependencyModules;
 }
