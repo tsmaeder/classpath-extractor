@@ -11,6 +11,7 @@ import com.google.gson.stream.JsonWriter;
 import ch.castleridge.mbt.cpe.json.MBTDependencyModuleInfo;
 import ch.castleridge.mbt.cpe.json.MBTInfo;
 import ch.castleridge.mbt.cpe.json.MBTTargetInfo;
+import ch.castleridge.mbt.cpe.json.MavenDependencyInfo;
 import ch.castleridge.mbt.cpe.json.MavenExtractedInfo;
 import ch.castleridge.mbt.cpe.json.MavenTargetInfo;
 import java.io.IOException;
@@ -168,7 +169,7 @@ public class MBTExtractor {
       }
     }
 
-    
+    promoteDependencyModulesThatAreTargets();
     MBTInfo mbtInfo = new MBTInfo(targets, dependencyModules.values());
     try (JsonWriter writer = gson.newJsonWriter(Files.newBufferedWriter(Path.of("mbt.json"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
       writer.setIndent("  ");
@@ -180,12 +181,41 @@ public class MBTExtractor {
     System.out.println("MBT extraction complete.");
   }
 
-  private Map<String, MBTDependencyModuleInfo> mapDependencyModules(Map<String, String> reportedDependencies) {
+  /**
+   * For each target, if a {@link MBTTargetInfo#dependencyModules} entry is itself a target id, treat
+   * it as an in-repo dependency: remove it from {@link MBTTargetInfo#dependencyModules} and record
+   * it under {@link MBTTargetInfo#dependsOn}. Also drop those ids from the global
+   * {@link #dependencyModules} map so they are not emitted twice in {@link MBTInfo}.
+   */
+  private void promoteDependencyModulesThatAreTargets() {
+    for (MBTTargetInfo target : targets.values()) {
+      if (target.dependencyModules != null && !target.dependencyModules.isEmpty()) {
+        List<String> workspaceDependencies = new ArrayList<>();
+        for (String depId : target.dependencyModules) {
+          if (targets.containsKey(depId)) {
+            workspaceDependencies.add(depId);
+          }
+        }
+        if (!workspaceDependencies.isEmpty()) {
+          target.dependencyModules.removeAll(workspaceDependencies);
+          if (target.dependsOn == null) {
+            target.dependsOn = workspaceDependencies;
+          } else {
+            target.dependsOn.addAll(workspaceDependencies);
+          }
+        }
+      }
+    }
+    dependencyModules.keySet().removeIf(targets::containsKey);
+  }
+
+  private Map<String, MBTDependencyModuleInfo> mapDependencyModules(Map<String, MavenDependencyInfo> reportedDependencies) {
     Map<String, MBTDependencyModuleInfo> result = new HashMap<>();
-    for (Map.Entry<String, String> entry : reportedDependencies.entrySet()) {
+    for (Map.Entry<String, MavenDependencyInfo> entry : reportedDependencies.entrySet()) {
       MBTDependencyModuleInfo dependencyModule = new MBTDependencyModuleInfo();
       dependencyModule.id = entry.getKey();
-      dependencyModule.path = entry.getValue();
+      dependencyModule.jar = entry.getValue().path;
+      dependencyModule.sources = entry.getValue().sourcesJarPath;
       result.put(entry.getKey(), dependencyModule);
     }
     return result;
@@ -211,6 +241,7 @@ public class MBTExtractor {
       testTarget.classes = List.of(target.getTestOutputFolder());
       testTarget.javaHome = target.getJdk();
       List<String> testDependencies = new ArrayList<>(target.getDependencies());
+      testDependencies.add(id);
       testDependencies.addAll(target.getTestDependencies());
       testTarget.dependencyModules = testDependencies;
       targets.put(testId, testTarget);

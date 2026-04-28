@@ -41,6 +41,7 @@ import com.google.gson.stream.JsonWriter;
 
 import ch.castleridge.mbt.cpe.json.MavenExtractedInfo;
 import ch.castleridge.mbt.cpe.json.MavenTargetInfo;
+import ch.castleridge.mbt.cpe.json.MavenDependencyInfo;
 
 @Named("classpath-extractor")
 @Singleton
@@ -139,10 +140,10 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   public void reportMavenTarget(MavenSession session, String id, MavenTarget mavenTarget) {
     LOGGER.info("Reporting maven target {}", id);
     Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties().get("mavenTargets");
-    Map<String, String> reportedDependencies = (Map<String, String>) session.getUserProperties().get("reportedDependencies");
+    Map<String, MavenDependencyInfo> reportedDependencies = (Map<String, MavenDependencyInfo>) session.getUserProperties().get("reportedDependencies");
     for (Map.Entry<String, Dependency> dependency : mavenTarget.getDependencies().entrySet()) {
       if (!mavenTargets.containsKey(dependency.getKey())) {
-        reportedDependencies.put(dependency.getKey(), dependency.getValue().getPath());
+        reportedDependencies.put(dependency.getKey(), new MavenDependencyInfo(dependency.getValue().getPath(), dependency.getValue().getSourcesJarPath()));
       }
     }
 
@@ -166,7 +167,7 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   @Override
   public void afterSessionStart(MavenSession session) throws MavenExecutionException {
     session.getUserProperties().put("mavenTargets", new TreeMap<String, MavenTargetInfo>());
-    session.getUserProperties().put("reportedDependencies", new TreeMap<String, String>());
+    session.getUserProperties().put("reportedDependencies", new TreeMap<String, MavenDependencyInfo>());
     session.getUserProperties().put(COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, new TreeMap<String, List<String>>());
     session.getUserProperties().put(DEBUG_COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, new TreeMap<String, List<String>>());
   }
@@ -176,7 +177,7 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   public void afterSessionEnd(MavenSession session) throws MavenExecutionException {
     Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties()
         .get("mavenTargets");
-    Map<String, String> reportedDependencies = (Map<String, String>) session.getUserProperties()
+    Map<String, MavenDependencyInfo> reportedDependencies = (Map<String, MavenDependencyInfo>) session.getUserProperties()
         .get("reportedDependencies");
     LOGGER.info("Writing classpath to file, {} maven targets", mavenTargets.size());
     String path = session.getUserProperties().getProperty("outfile");
