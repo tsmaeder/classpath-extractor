@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import org.apache.maven.AbstractMavenLifecycleParticipant;
@@ -32,7 +33,11 @@ import org.apache.maven.model.Plugin;
 import org.apache.maven.model.PluginExecution;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
+import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.resolution.ArtifactRequest;
+import org.eclipse.aether.resolution.ArtifactResult;
+import org.eclipse.aether.artifact.DefaultArtifact;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +55,9 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   ClasspathExtractorParticipant() {
     LOGGER.info("ClasspathExtractorParticipant initialized");
   }
+
+  @Inject()
+  private RepositorySystem repositorySystem;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClasspathExtractorParticipant.class);
 
@@ -142,15 +150,15 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties().get("mavenTargets");
     Map<String, MavenDependencyInfo> reportedDependencies = (Map<String, MavenDependencyInfo>) session.getUserProperties().get("reportedDependencies");
     for (Map.Entry<String, Dependency> dependency : mavenTarget.getDependencies().entrySet()) {
-      if (!mavenTargets.containsKey(dependency.getKey())) {
-        reportedDependencies.put(dependency.getKey(), new MavenDependencyInfo(dependency.getValue().getPath(), dependency.getValue().getSourcesJarPath()));
+      if (!mavenTargets.containsKey(dependency.getKey()) && !reportedDependencies.containsKey(dependency.getKey())) {
+        reportedDependencies.put(dependency.getKey(), new MavenDependencyInfo(dependency.getValue().path, resolveSourcesJar(session, dependency.getValue())));
       }
     }
 
     List<String> testDependencies = new ArrayList<>();
     List<String> dependencies = new ArrayList<>();
     for (Map.Entry<String, Dependency> dependency : mavenTarget.getDependencies().entrySet()) {
-      if (dependency.getValue().getScope().equals("test")) {
+      if (dependency.getValue().scope.equals("test")) {
         testDependencies.add(dependency.getKey());
       } else {
         dependencies.add(dependency.getKey());
@@ -164,8 +172,29 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     LOGGER.info("Maven target {} reported, now have {} maven targets", id, mavenTargets.size());
   }
 
+     private String resolveSourcesJar(MavenSession session, Dependency dependency) {
+      DefaultArtifact sources = new DefaultArtifact(
+          dependency.groupId,
+          dependency.artifactId,
+          "sources",
+          "jar",
+          dependency.baseVersion
+      );      
+  
+      ArtifactRequest request = new ArtifactRequest();
+      request.setArtifact(sources);
+  
+      try {
+        ArtifactResult result = repositorySystem.resolveArtifact(session.getRepositorySession(), request);
+        return result.getArtifact().getFile().getAbsolutePath();
+      } catch (Exception e) {
+        LOGGER.warn("Error resolving sources jar for artifact " + dependency.groupId + ":" + dependency.artifactId + ":" + dependency.baseVersion, e);
+        return null;
+      }
+  }
+
   @Override
-  public void afterSessionStart(MavenSession session) throws MavenExecutionException {
+  public void afterSessionStart(MavenSession session) {
     session.getUserProperties().put("mavenTargets", new TreeMap<String, MavenTargetInfo>());
     session.getUserProperties().put("reportedDependencies", new TreeMap<String, MavenDependencyInfo>());
     session.getUserProperties().put(COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, new TreeMap<String, List<String>>());
@@ -201,17 +230,13 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
   public File findFileForArtifact(MavenSession session, Artifact artifact) {
     Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties()
         .get("mavenTargets");
-    String key = artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + artifact.getVersion();
+    String key = artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + artifact.getBaseVersion();
     MavenTargetInfo mavenTarget = mavenTargets.get(key);
     if (mavenTarget != null) {
       return new File(mavenTarget.getOutputFolder());
     }
-    try {
-      return Files.createTempDirectory("mbt-extractor").toFile();
-    } catch (IOException e) {
-      e.printStackTrace();
-      return null;
-    }
+    
+    return null;
   }
 
   @SuppressWarnings("unchecked")

@@ -19,9 +19,11 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -143,6 +145,7 @@ public class MBTExtractor {
         MavenBuildRunner.runMaven(projectDir, profileFile, (List<String> command) -> {
           command.add("-Dmaven.ext.class.path=" + resolveJar(LIFECYCLE_PARTICIPANT).toAbsolutePath());
           command.add("-Doutfile=" + outfile.toAbsolutePath());
+          command.add("-e");
           command.addAll(extraArguments);
           command.add("--fail-never");
           command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
@@ -214,11 +217,29 @@ public class MBTExtractor {
     for (Map.Entry<String, MavenDependencyInfo> entry : reportedDependencies.entrySet()) {
       MBTDependencyModuleInfo dependencyModule = new MBTDependencyModuleInfo();
       dependencyModule.id = entry.getKey();
-      dependencyModule.jar = entry.getValue().path;
-      dependencyModule.sources = entry.getValue().sourcesJarPath;
+      // Convert to URI in preparation of other schemes than file:// like mvn://
+      dependencyModule.jar = Paths.get(entry.getValue().path).toUri().toString();
+      if (entry.getValue().sourcesJarPath != null) {
+        dependencyModule.sources = Paths.get(entry.getValue().sourcesJarPath).toUri().toString();
+      } 
       result.put(entry.getKey(), dependencyModule);
     }
     return result;
+  }
+
+  private String workspaceRelativePath(Path path) {
+    Path relative = baseDir.relativize(path);
+    StringBuilder result = new StringBuilder();
+    boolean first = true; 
+    for (Path segment : relative) {
+      if (first) {
+        first = false;
+      } else {
+        result.append("/");
+      }
+      result.append(segment.toString());
+    }
+    return result.toString();
   }
 
   private void extractTargets(MavenExtractedInfo extractedInfo) {
@@ -228,17 +249,16 @@ public class MBTExtractor {
       MavenTargetInfo target = entry.getValue();
       MBTTargetInfo mbtTarget = new MBTTargetInfo();
       mbtTarget.compilerOptions = target.getCompileJavacOptions();
-      mbtTarget.sources = target.getInputFolders();
-      mbtTarget.classes = List.of(target.getOutputFolder());
+      mbtTarget.sources = target.getInputFolders().stream().map(Paths::get).map(this::workspaceRelativePath).collect(Collectors.toList());
+      mbtTarget.classes = List.of(this.workspaceRelativePath(Paths.get(target.getOutputFolder())));
       mbtTarget.javaHome = target.getJdk();
-      List<String> dependencies = new ArrayList<>(target.getDependencies());
-      mbtTarget.dependencyModules = dependencies;
+      mbtTarget.dependencyModules = new ArrayList<>(target.getDependencies());
       targets.put(id, mbtTarget);
 
       MBTTargetInfo testTarget = new MBTTargetInfo();
       testTarget.compilerOptions = target.getTestCompileJavacOptions();
-      testTarget.sources = target.getTestInputFolders();
-      testTarget.classes = List.of(target.getTestOutputFolder());
+      testTarget.sources = target.getTestInputFolders().stream().map(Paths::get).map(this::workspaceRelativePath).collect(Collectors.toList());
+      testTarget.classes = List.of(this.workspaceRelativePath(Paths.get(target.getTestOutputFolder())));
       testTarget.javaHome = target.getJdk();
       List<String> testDependencies = new ArrayList<>(target.getDependencies());
       testDependencies.add(id);
@@ -254,7 +274,7 @@ public class MBTExtractor {
         (p, attrs) -> attrs.isRegularFile() && p.getFileName().toString().equals("pom.xml"))) {
       stream.forEach(poms::add);
     }
-    poms.sort((a, b) -> Integer.compare(a.toString().length(), b.toString().length()));
+    poms.sort(Comparator.comparingInt(a -> a.toString().length()));
     return poms;
   }
 

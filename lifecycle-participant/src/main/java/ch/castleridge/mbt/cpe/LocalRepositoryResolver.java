@@ -36,10 +36,10 @@ public class LocalRepositoryResolver implements ArtifactResolverPostProcessor {
         for (ArtifactResult result : results) {
             // Check if the result failed (or if you want to override a successful one)
             if (!result.isResolved()) {
-                LOGGER.info("Artifact {} not resolved", result.getRequest().getArtifact());
                 File f = participant.findFileForArtifact(this.session, result.getRequest().getArtifact());
-                
-                result.setArtifact(result.getRequest().getArtifact().setFile(f));
+                if (f != null) {
+                    result.setArtifact(result.getRequest().getArtifact().setFile(f));
+                }
             }
         }
     }
