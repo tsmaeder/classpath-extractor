@@ -24,7 +24,7 @@ import org.apache.maven.toolchain.Toolchain;
 import org.apache.maven.toolchain.ToolchainManager;
 import org.apache.maven.toolchain.java.DefaultJavaToolChain;
 
-@Mojo(name = "extract", requiresDependencyResolution = ResolutionScope.TEST, requiresProject = true, defaultPhase = LifecyclePhase.TEST_COMPILE)
+@Mojo(name = "extract", requiresDependencyResolution = ResolutionScope.TEST, threadSafe = true, requiresProject = true, defaultPhase = LifecyclePhase.TEST_COMPILE)
 public class ClasspathExtractorMojo extends AbstractMojo {
 
   private static final Set<String> SKIPPED_PACKAGING = Set.of("pom");
@@ -45,6 +45,8 @@ public class ClasspathExtractorMojo extends AbstractMojo {
   public void execute() {
     getLog().info("Extracting classpath information for project " + project.getGroupId() + ":" + project.getArtifactId()
         + ":" + project.getVersion());
+
+    participant.reportPomFile(session, project.getFile().toPath().toAbsolutePath().normalize().toString());
     if (SKIPPED_PACKAGING.contains(project.getPackaging())) {
       getLog().info("Skipping project " + project.getGroupId() + ":" + project.getArtifactId() + ":"
           + project.getVersion() + " because it has packaging " + project.getPackaging());
@@ -56,7 +58,7 @@ public class ClasspathExtractorMojo extends AbstractMojo {
       dependencies.put(key, new Dependency(dep.getGroupId(), dep.getArtifactId(), dep.getBaseVersion(), dep.getFile().toString(), dep.getScope()));
     }
 
-    MavenTarget mavenTarget = new MavenTarget(project.getFile().toString(),
+    MavenTarget mavenTarget = new MavenTarget(
         project.getCompileSourceRoots(),
         project.getBuild().getOutputDirectory(),
         project.getTestCompileSourceRoots(),

@@ -23,6 +23,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -129,6 +130,8 @@ public class MBTExtractor {
         command.add("-Dpackaging=maven-plugin");
     });
 
+    // System.err.println("Todo: \n" + todo.stream().map(Path::toString).sorted().collect(Collectors.joining("\n")));
+    String lifecycleParticipantJar = resolveJar(LIFECYCLE_PARTICIPANT).toAbsolutePath().toString();
     while (!todo.isEmpty()) {
       Path pomPath = todo.remove(0);
       Path pomAbsolute = pomPath.normalize().toAbsolutePath();
@@ -143,20 +146,25 @@ public class MBTExtractor {
       Path outfile = createUniqueOutfile();
       try {
         MavenBuildRunner.runMaven(projectDir, profileFile, (List<String> command) -> {
-          command.add("-Dmaven.ext.class.path=" + resolveJar(LIFECYCLE_PARTICIPANT).toAbsolutePath());
+          command.add("-f");
+          command.add(pomAbsolute.toString());
+          command.add("-Dmaven.ext.class.path=" + lifecycleParticipantJar);
           command.add("-Doutfile=" + outfile.toAbsolutePath());
-          command.add("-e");
+          // command.add("-e");
           command.addAll(extraArguments);
+          command.add("-q");
           command.add("--fail-never");
+          command.add("-T"); 
+          command.add("1C");
+          command.add("--no-snapshot-updates");
           command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
-          command.add("test-compile");
+          command.add("process-test-resources");
           command.add("ch.castleridge:classpath-extractor-maven-plugin:extract");
         });
         MavenExtractedInfo extractedInfo = readClasspathJson(outfile);
         if (extractedInfo != null) {
-          System.out.println("Extracted info for: " + extractedInfo.mavenTargets.size() + " maven targets");
-          List<Path> pomPathsFromJson = collectPomPaths(extractedInfo);
-          removePomsFromTodo(pomPathsFromJson);
+          System.out.println("Extracted info for: " + extractedInfo.pomFilesProcessed.size() + " pom files");
+          removePomsFromTodo(extractedInfo.pomFilesProcessed);
           registerMavenBuildOutputRoots(extractedInfo);
           extractTargets(extractedInfo);
           dependencyModules.putAll(mapDependencyModules(extractedInfo.reportedDependencies));
@@ -288,27 +296,16 @@ public class MBTExtractor {
     }
   }
 
-  private List<Path> collectPomPaths(MavenExtractedInfo extractedInfo) {
-    List<Path> result = new ArrayList<>();
-    if (extractedInfo == null) {
-      return result;
-    }
-    for (MavenTargetInfo target : extractedInfo.mavenTargets.values()) {
-      if (target != null && target.getPom() != null && !target.getPom().isEmpty()) {
-        result.add(Path.of(target.getPom()).normalize().toAbsolutePath());
-      }
-    }
-    return result;
-  }
-
-  private void removePomsFromTodo(List<Path> pomPathsFromJson) {
-    if (pomPathsFromJson == null || pomPathsFromJson.isEmpty()) {
-      return;
-    }
+  private void removePomsFromTodo(Collection<String> pomPathsFromJson) {
+    int before = todo.size();
     todo.removeIf(todoPath -> {
-      Path normalized = todoPath.normalize().toAbsolutePath();
-      return pomPathsFromJson.stream().anyMatch(normalized::equals);
+      String normalized = todoPath.normalize().toAbsolutePath().toString();
+      return pomPathsFromJson.contains(normalized);
     });
+    if (todo.size() + pomPathsFromJson.size() != before + 1) { // +1 because the current pom is already removed
+      System.err.println("Error: " + (before - todo.size()) + " != " + pomPathsFromJson.size());
+      System.err.println("Pom paths from json strings: \n" + pomPathsFromJson.stream().sorted().collect(Collectors.joining("\n")));
+    }
   }
 
   /**

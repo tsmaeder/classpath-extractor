@@ -8,7 +8,7 @@ package ch.castleridge.mbt.cpe.json;
 import java.util.List;
 
 public class MavenTargetInfo {
-  public MavenTargetInfo(String pom,
+  public MavenTargetInfo(
       List<String> inputFolders,
       String outputFolder,
       List<String> dependencies,
@@ -19,7 +19,6 @@ public class MavenTargetInfo {
       String jdk,
       List<String> compileJavacOptions,
       List<String> testCompileJavacOptions) {
-    this.pom = pom;
     this.inputFolders = inputFolders;
     this.outputFolder = outputFolder;
     this.dependencies = dependencies;
@@ -32,7 +31,6 @@ public class MavenTargetInfo {
     this.testCompileJavacOptions = testCompileJavacOptions;
   }
 
-  private String pom;
   private List<String> inputFolders;
   private String outputFolder;
   private List<String> dependencies;
@@ -43,9 +41,6 @@ public class MavenTargetInfo {
   private List<String> compileJavacOptions;
   private List<String> testCompileJavacOptions;
   private String buildDirectory;
-  public String getPom() {
-    return pom;
-  }
 
   public List<String> getInputFolders() {
     return inputFolders;

@@ -103,7 +103,6 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     Map<String, List<String>> compileOptionsByProject = new TreeMap<>();
     Map<String, List<String>> debugCompileOptionsByProject = new TreeMap<>();
 
-    
     for (MavenProject project : session.getProjects()) {
       Build build = project.getBuild();
       if (build == null || build.getPlugins() == null) {
@@ -111,7 +110,6 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
       }
 
       String projectId = project.getGroupId() + ":" + project.getArtifactId() + ":" + project.getVersion();
-
 
       for (Plugin plugin : build.getPlugins()) {
         String pluginKey = plugin.getGroupId() + ":" + plugin.getArtifactId();
@@ -128,9 +126,6 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
         }
       }
     }
-
-    session.getUserProperties().put(COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, compileOptionsByProject);
-    session.getUserProperties().put(DEBUG_COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, debugCompileOptionsByProject);
   }
 
   private Collection<String> getStringListUserProperty(MavenSession session, String propertyName) {
@@ -138,15 +133,22 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     if (userConfiguredStringList == null || userConfiguredStringList.trim().isEmpty()) {
       return Collections.emptyList();
     }
-    
+
     return Arrays.stream(userConfiguredStringList.split(","))
         .filter(phase -> !phase.trim().isEmpty())
         .collect(Collectors.toList());
   }
 
   @SuppressWarnings("unchecked")
+  public void reportPomFile(MavenSession session, String pomFile) {
+    // System.err.println("Reporting pom file: " + pomFile);
+    Set<String> pomFilesProcessed = (Set<String>) session.getUserProperties().get("pomFilesProcessed");
+    pomFilesProcessed.add(pomFile);
+  }
+
+  @SuppressWarnings("unchecked")
   public void reportMavenTarget(MavenSession session, String id, MavenTarget mavenTarget) {
-    LOGGER.info("Reporting maven target {}", id);
+
     Map<String, MavenTargetInfo> mavenTargets = (Map<String, MavenTargetInfo>) session.getUserProperties().get("mavenTargets");
     Map<String, MavenDependencyInfo> reportedDependencies = (Map<String, MavenDependencyInfo>) session.getUserProperties().get("reportedDependencies");
     for (Map.Entry<String, Dependency> dependency : mavenTarget.getDependencies().entrySet()) {
@@ -166,39 +168,41 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     }
 
     mavenTargets.put(id,
-        new MavenTargetInfo(mavenTarget.getPom(), mavenTarget.getInputFolders(), mavenTarget.getOutputFolder(),
+        new MavenTargetInfo(mavenTarget.getInputFolders(), mavenTarget.getOutputFolder(),
             dependencies, testDependencies, mavenTarget.getTestInputFolders(), mavenTarget.getTestOutputFolder(),
-            mavenTarget.getBuildDirectory(), mavenTarget.getJdk(), getCompileJavacOptions(session, id), getTestCompileJavacOptions(session, id)));
+            mavenTarget.getBuildDirectory(), mavenTarget.getJdk(), getCompileJavacOptions(session, id),
+            getTestCompileJavacOptions(session, id)));
     LOGGER.info("Maven target {} reported, now have {} maven targets", id, mavenTargets.size());
   }
 
-     private String resolveSourcesJar(MavenSession session, Dependency dependency) {
-      DefaultArtifact sources = new DefaultArtifact(
-          dependency.groupId,
-          dependency.artifactId,
-          "sources",
-          "jar",
-          dependency.baseVersion
-      );      
-  
-      ArtifactRequest request = new ArtifactRequest();
-      request.setArtifact(sources);
-  
-      try {
-        ArtifactResult result = repositorySystem.resolveArtifact(session.getRepositorySession(), request);
-        return result.getArtifact().getFile().getAbsolutePath();
-      } catch (Exception e) {
-        LOGGER.warn("Error resolving sources jar for artifact " + dependency.groupId + ":" + dependency.artifactId + ":" + dependency.baseVersion, e);
-        return null;
-      }
+  private String resolveSourcesJar(MavenSession session, Dependency dependency) {
+    DefaultArtifact sources = new DefaultArtifact(
+        dependency.groupId,
+        dependency.artifactId,
+        "sources",
+        "jar",
+        dependency.baseVersion);
+
+    ArtifactRequest request = new ArtifactRequest();
+    request.setArtifact(sources);
+
+    try {
+      ArtifactResult result = repositorySystem.resolveArtifact(session.getRepositorySession(), request);
+      return result.getArtifact().getFile().getAbsolutePath();
+    } catch (Exception e) {
+      LOGGER.warn("Error resolving sources jar for artifact " + dependency.groupId + ":" + dependency.artifactId + ":"
+          + dependency.baseVersion);
+      return null;
+    }
   }
 
   @Override
   public void afterSessionStart(MavenSession session) {
-    session.getUserProperties().put("mavenTargets", new TreeMap<String, MavenTargetInfo>());
-    session.getUserProperties().put("reportedDependencies", new TreeMap<String, MavenDependencyInfo>());
-    session.getUserProperties().put(COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, new TreeMap<String, List<String>>());
-    session.getUserProperties().put(DEBUG_COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, new TreeMap<String, List<String>>());
+    session.getUserProperties().put("pomFilesProcessed", Collections.synchronizedSet(new HashSet<>()));
+    session.getUserProperties().put("mavenTargets", Collections.synchronizedMap(new TreeMap<String, MavenTargetInfo>()));
+    session.getUserProperties().put("reportedDependencies", Collections.synchronizedMap(new TreeMap<String, MavenDependencyInfo>()));
+    session.getUserProperties().put(COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, Collections.synchronizedMap(new TreeMap<String, List<String>>()));
+    session.getUserProperties().put(DEBUG_COMPILE_OPTIONS_BY_PROJECT_USER_PROPERTY, Collections.synchronizedMap(new TreeMap<String, List<String>>()));
   }
 
   @SuppressWarnings("unchecked")
@@ -208,6 +212,7 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
         .get("mavenTargets");
     Map<String, MavenDependencyInfo> reportedDependencies = (Map<String, MavenDependencyInfo>) session.getUserProperties()
         .get("reportedDependencies");
+    Set<String> pomFilesProcessed = (Set<String>) session.getUserProperties().get("pomFilesProcessed");
     LOGGER.info("Writing classpath to file, {} maven targets", mavenTargets.size());
     String path = session.getUserProperties().getProperty("outfile");
     if (path == null) {
@@ -219,7 +224,7 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     try (JsonWriter writer = gson.newJsonWriter(new PrintWriter(
         Files.newBufferedWriter(Paths.get(path), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)))) {
       writer.setIndent("  ");
-      gson.toJson(new MavenExtractedInfo(mavenTargets, reportedDependencies), MavenExtractedInfo.class, writer);
+      gson.toJson(new MavenExtractedInfo(mavenTargets, reportedDependencies, pomFilesProcessed), MavenExtractedInfo.class, writer);
     } catch (IOException e) {
       throw new MavenExecutionException("Failed to write classpath to file", e);
     }
@@ -235,7 +240,7 @@ public class ClasspathExtractorParticipant extends AbstractMavenLifecyclePartici
     if (mavenTarget != null) {
       return new File(mavenTarget.getOutputFolder());
     }
-    
+
     return null;
   }
 
